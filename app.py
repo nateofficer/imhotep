@@ -1,9 +1,16 @@
-from flask import Flask, request, redirect, send_from_directory
+from flask import Flask, request, redirect, send_from_directory, session, url_for
 import sqlite3
 import os
 import time
+from functools import wraps
 
 app = Flask(__name__)
+
+# Secret key for sessions - set this in Render's environment variables
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-change-me')
+
+# Admin password - set this in Render's environment variables
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'changeme')
 
 # Upload folder - works locally and on Render
 UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
@@ -63,6 +70,16 @@ def init_db():
 init_db()
 
 
+def login_required(f):
+    """Decorator that protects admin pages."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('logged_in'):
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
 STYLE = '''
 <style>
     body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; background: #f5f5f5; }
@@ -79,8 +96,35 @@ STYLE = '''
     .application { background: white; padding: 15px; margin: 10px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
     .nav { margin-bottom: 20px; }
     .nav a { margin-right: 15px; color: #3498db; text-decoration: none; font-weight: bold; }
+    .error { background: #ffe6e6; color: #c0392b; padding: 10px; border-radius: 5px; margin: 10px 0; }
+    .admin-badge { background: #2ecc71; color: white; padding: 4px 10px; border-radius: 4px; font-size: 12px; margin-left: 10px; }
 </style>
 '''
+
+
+def public_nav():
+    return '''
+    <div class="nav">
+        <a href="/">View Jobs</a>
+        <a href="/login">Admin Login</a>
+    </div>
+    '''
+
+
+def admin_nav():
+    return '''
+    <div class="nav">
+        <a href="/">View Jobs</a>
+        <a href="/applications">View Applications</a>
+        <a href="/post-job">Post a Job</a>
+        <a href="/logout">Logout</a>
+        <span class="admin-badge">ADMIN</span>
+    </div>
+    '''
+
+
+def get_nav():
+    return admin_nav() if session.get('logged_in') else public_nav()
 
 
 @app.route('/')
@@ -89,29 +133,54 @@ def show_jobs():
     jobs = conn.execute('SELECT * FROM jobs ORDER BY posted_date DESC').fetchall()
     conn.close()
 
-    html = STYLE + '''
-    <div class="nav">
-        <a href="/">Home</a>
-        <a href="/applications">View Applications</a>
-        <a href="/post-job">Post a Job</a>
-    </div>
-    <h1>Casey's Cleaning Company - Open Positions</h1>
-    '''
+    html = STYLE + get_nav() + "<h1>Casey's Cleaning Company - Open Positions</h1>"
 
-    for job in jobs:
-        html += f'''
-        <div class="job">
-            <h2>{job['title']}</h2>
-            <p><strong>Pay:</strong> {job['pay'] or 'TBD'}</p>
-            <p><strong>Location:</strong> {job['location'] or 'TBD'}</p>
-            <p>{job['description'] or ''}</p>
-            <a class="btn" href="/apply/{job['id']}">Apply Now</a>
-        </div>
-        '''
+    if not jobs:
+        html += '<p>No open positions at this time. Please check back soon!</p>'
+    else:
+        for job in jobs:
+            html += f'''
+            <div class="job">
+                <h2>{job['title']}</h2>
+                <p><strong>Pay:</strong> {job['pay'] or 'TBD'}</p>
+                <p><strong>Location:</strong> {job['location'] or 'TBD'}</p>
+                <p>{job['description'] or ''}</p>
+                <a class="btn" href="/apply/{job['id']}">Apply Now</a>
+            </div>
+            '''
     return html
 
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    error = ''
+    if request.method == 'POST':
+        password = request.form.get('password', '')
+        if password == ADMIN_PASSWORD:
+            session['logged_in'] = True
+            return redirect('/applications')
+        else:
+            error = '<div class="error">Incorrect password. Try again.</div>'
+
+    return STYLE + public_nav() + f'''
+    <h1>Admin Login</h1>
+    {error}
+    <form method="POST">
+        <label>Password:</label>
+        <input type="password" name="password" required autofocus>
+        <button class="btn" type="submit">Login</button>
+    </form>
+    '''
+
+
+@app.route('/logout')
+def logout():
+    session.pop('logged_in', None)
+    return redirect('/')
+
+
 @app.route('/applications')
+@login_required
 def view_applications():
     conn = get_db()
     apps = conn.execute('''
@@ -122,14 +191,7 @@ def view_applications():
     ''').fetchall()
     conn.close()
 
-    html = STYLE + '''
-    <div class="nav">
-        <a href="/">Home</a>
-        <a href="/applications">View Applications</a>
-        <a href="/post-job">Post a Job</a>
-    </div>
-    <h1>Job Applications</h1>
-    '''
+    html = STYLE + admin_nav() + '<h1>Job Applications</h1>'
 
     if not apps:
         html += '<p>No applications yet.</p>'
@@ -155,6 +217,7 @@ def view_applications():
 
 
 @app.route('/delete/<int:candidate_id>', methods=['POST'])
+@login_required
 def delete_application(candidate_id):
     conn = get_db()
     conn.execute('DELETE FROM candidates WHERE id = ?', (candidate_id,))
@@ -164,6 +227,7 @@ def delete_application(candidate_id):
 
 
 @app.route('/post-job', methods=['GET', 'POST'])
+@login_required
 def post_job():
     if request.method == 'POST':
         conn = get_db()
@@ -177,12 +241,7 @@ def post_job():
         conn.close()
         return redirect('/')
 
-    return STYLE + '''
-    <div class="nav">
-        <a href="/">Home</a>
-        <a href="/applications">View Applications</a>
-        <a href="/post-job">Post a Job</a>
-    </div>
+    return STYLE + admin_nav() + '''
     <h1>Post a New Job</h1>
     <form method="POST">
         <label>Job Title:</label>
@@ -226,7 +285,7 @@ def apply(job_id):
         conn.commit()
         conn.close()
 
-        return STYLE + '''
+        return STYLE + public_nav() + '''
         <h1>Thank You!</h1>
         <p>Your application has been submitted successfully. We will be in touch soon.</p>
         <a class="btn" href="/">Back to Jobs</a>
@@ -235,12 +294,9 @@ def apply(job_id):
     conn.close()
 
     if not job:
-        return STYLE + '<h1>Job not found</h1><a href="/">Back</a>'
+        return STYLE + public_nav() + '<h1>Job not found</h1><a href="/">Back</a>'
 
-    return STYLE + f'''
-    <div class="nav">
-        <a href="/">Home</a>
-    </div>
+    return STYLE + public_nav() + f'''
     <h1>Apply: {job['title']}</h1>
     <form method="POST" enctype="multipart/form-data">
         <label>First Name:</label>
@@ -259,6 +315,7 @@ def apply(job_id):
 
 
 @app.route('/resume/<filename>')
+@login_required
 def download_resume(filename):
     return send_from_directory(UPLOAD_FOLDER, filename)
 
