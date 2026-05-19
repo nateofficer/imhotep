@@ -290,6 +290,7 @@ def admin_nav():
         <a href="/applications">Applications</a>
         <a href="/post-job">Post a Job</a>
         <a href="/training-modules">Training</a>
+        <a href="/onboarding-forms">Onboarding</a>
         <a href="/trainees">Trainees</a>
         <a href="/logout">Logout</a>
         <span class="admin-badge">ADMIN</span>
@@ -301,6 +302,7 @@ def trainee_nav():
     return '''
     <div class="nav">
         <a href="/training">My Training</a>
+        <a href="/onboarding">My Onboarding</a>
         <a href="/trainee-logout">Logout</a>
         <span class="trainee-badge">TRAINEE</span>
     </div>
@@ -1302,6 +1304,483 @@ def submit_quiz(module_id):
         <p><a class="btn" href="/training">Back to My Training</a></p>
         '''
     return html
+
+
+# ============ ONBOARDING MODULE ============
+
+def onboarding_nav():
+    return '''
+    <div class="nav">
+        <a href="/onboarding">My Onboarding</a>
+        <a href="/trainee-logout">Logout</a>
+        <span class="trainee-badge">ONBOARDING</span>
+    </div>
+    '''
+
+ONBOARDING_STYLE = '''
+<style>
+    .onboard-step { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin: 15px 0; border-left: 5px solid #95a5a6; }
+    .onboard-step.complete { border-left-color: #27ae60; }
+    .onboard-step.pending { border-left-color: #f39c12; }
+    .step-number { display: inline-block; background: #95a5a6; color: white; border-radius: 50%; width: 28px; height: 28px; text-align: center; line-height: 28px; font-weight: bold; margin-right: 10px; font-size: 14px; }
+    .step-number.complete { background: #27ae60; }
+    .step-number.pending { background: #f39c12; }
+    .doc-box { background: #f9f9f9; border: 1px solid #ddd; border-radius: 5px; padding: 20px; margin: 15px 0; max-height: 350px; overflow-y: auto; font-size: 13px; line-height: 1.6; white-space: pre-wrap; }
+    .sign-box { background: #fff3cd; border: 1px solid #ffc107; border-radius: 5px; padding: 15px; margin: 15px 0; }
+    .sign-box label { color: #856404; }
+    .progress-bar { background: #ecf0f1; border-radius: 10px; height: 10px; margin: 10px 0; }
+    .progress-fill { background: #27ae60; border-radius: 10px; height: 10px; transition: width 0.3s; }
+    .upload-area { border: 2px dashed #ddd; border-radius: 5px; padding: 20px; text-align: center; margin: 10px 0; }
+    .onboard-badge { background: #e67e22; color: white; padding: 4px 10px; border-radius: 4px; font-size: 12px; margin-left: 10px; font-weight: bold; }
+</style>
+'''
+
+
+def init_onboarding_db():
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS onboarding_forms (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            title VARCHAR(255) NOT NULL,
+            description TEXT,
+            form_type VARCHAR(50) DEFAULT 'custom',
+            content TEXT,
+            file_filename VARCHAR(255),
+            required_for VARCHAR(20) DEFAULT 'both',
+            sort_order INT DEFAULT 0,
+            active INT DEFAULT 1,
+            created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS onboarding_signatures (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            trainee_id INT NOT NULL,
+            form_id INT NOT NULL,
+            signed_name VARCHAR(255),
+            signed_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            ip_address VARCHAR(50),
+            FOREIGN KEY (trainee_id) REFERENCES trainees(id),
+            FOREIGN KEY (form_id) REFERENCES onboarding_forms(id),
+            UNIQUE KEY unique_sig (trainee_id, form_id)
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+init_onboarding_db()
+
+
+# ---- ADMIN: MANAGE ONBOARDING FORMS ----
+
+@app.route('/onboarding-forms')
+@login_required
+def onboarding_forms_list():
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM onboarding_forms ORDER BY sort_order, created_date')
+    forms = cursor.fetchall()
+    conn.close()
+
+    html = STYLE + ONBOARDING_STYLE + admin_nav() + '<h1>Onboarding Forms</h1>'
+    html += '<p class="form-note">These forms are presented to new hires after training. They must sign each one to complete onboarding.</p>'
+    html += '<p><a class="btn btn-success" href="/onboarding-forms/new">+ Add Form / Document</a></p>'
+
+    if not forms:
+        html += '<div class="info"><p>No onboarding forms yet. Add your NCA, policies, W-4, I-9, etc.</p></div>'
+    else:
+        for f in forms:
+            required_for_label = {'both': 'Employees & Contractors', 'employee': 'Employees only', 'contractor': 'Contractors only'}.get(f['required_for'], 'Both')
+            active_badge = '<span style="background:#27ae60;color:white;padding:2px 8px;border-radius:3px;font-size:11px;">Active</span>' if f['active'] else '<span style="background:#95a5a6;color:white;padding:2px 8px;border-radius:3px;font-size:11px;">Inactive</span>'
+            file_note = 'File uploaded' if f['file_filename'] else 'Text content'
+            html += f'''
+            <div class="onboard-step">
+                <h2>#{f["sort_order"] or "?"} {f["title"]} {active_badge}</h2>
+                <p><strong>Type:</strong> {f["form_type"].upper()} &nbsp;|&nbsp; <strong>Required for:</strong> {required_for_label} &nbsp;|&nbsp; {file_note}</p>
+                <p>{f["description"] or ""}</p>
+                <a class="btn" href="/onboarding-forms/{f["id"]}/edit">Edit</a>
+                <form method="POST" action="/onboarding-forms/{f["id"]}/delete" onsubmit="return confirm('Delete this form?');" style="display:inline-block;box-shadow:none;padding:0;background:none;">
+                    <button class="btn btn-danger" type="submit">Delete</button>
+                </form>
+            </div>
+            '''
+    return html
+
+
+@app.route('/onboarding-forms/new', methods=['GET', 'POST'])
+@login_required
+def new_onboarding_form():
+    if request.method == 'POST':
+        conn = get_db()
+        cursor = conn.cursor()
+        file_filename = None
+        if 'form_file' in request.files:
+            f = request.files['form_file']
+            if f and f.filename:
+                timestamp = str(int(time.time()))
+                file_filename = f"{timestamp}_form_{f.filename}"
+                f.save(os.path.join(UPLOAD_FOLDER, file_filename))
+        cursor.execute('''INSERT INTO onboarding_forms
+                          (title, description, form_type, content, file_filename, required_for, sort_order, active)
+                          VALUES (%s, %s, %s, %s, %s, %s, %s, 1)''',
+                       (request.form['title'],
+                        request.form.get('description', ''),
+                        request.form.get('form_type', 'custom'),
+                        request.form.get('content', ''),
+                        file_filename,
+                        request.form.get('required_for', 'both'),
+                        int(request.form.get('sort_order', 1))))
+        conn.commit()
+        conn.close()
+        return redirect('/onboarding-forms')
+
+    return STYLE + ONBOARDING_STYLE + admin_nav() + '''
+    <h1>Add Onboarding Form</h1>
+    <form method="POST" enctype="multipart/form-data">
+        <label>Form Title:</label>
+        <input type="text" name="title" required placeholder="e.g. Non-Compete Agreement, Company Policy, W-4">
+
+        <label>Form Type:</label>
+        <select name="form_type">
+            <option value="nca">NCA / Non-Compete</option>
+            <option value="policy">Company Policy</option>
+            <option value="w4">W-4 (Employee Tax)</option>
+            <option value="w9">W-9 (Contractor Tax)</option>
+            <option value="i9">I-9 (Identity Verification)</option>
+            <option value="custom">Other / Custom</option>
+        </select>
+
+        <label>Required For:</label>
+        <select name="required_for">
+            <option value="both">Both Employees & Contractors</option>
+            <option value="employee">Employees Only</option>
+            <option value="contractor">Contractors Only</option>
+        </select>
+
+        <label>Display Order (1 = shown first):</label>
+        <input type="number" name="sort_order" value="1" min="1" max="20">
+
+        <label>Description (shown to employee before signing):</label>
+        <textarea name="description" rows="2" placeholder="Brief description of what this document is"></textarea>
+
+        <label>Document Text (paste your NCA, policy text, etc. here):</label>
+        <textarea name="content" rows="12" placeholder="Paste the full text of the document here. The employee will read this before signing."></textarea>
+
+        <label>OR Upload a PDF/Image of the form:</label>
+        <div class="upload-area">
+            <input type="file" name="form_file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg">
+            <p class="form-note">Upload a PDF or image instead of pasting text above</p>
+        </div>
+
+        <button class="btn btn-success" type="submit">Save Form</button>
+        <a class="btn" href="/onboarding-forms" style="background:#95a5a6;">Cancel</a>
+    </form>
+    '''
+
+
+@app.route('/onboarding-forms/<int:form_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_onboarding_form(form_id):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM onboarding_forms WHERE id = %s', (form_id,))
+    form = cursor.fetchone()
+    if not form:
+        conn.close()
+        return redirect('/onboarding-forms')
+
+    if request.method == 'POST':
+        file_filename = form['file_filename']
+        if 'form_file' in request.files:
+            f = request.files['form_file']
+            if f and f.filename:
+                timestamp = str(int(time.time()))
+                file_filename = f"{timestamp}_form_{f.filename}"
+                f.save(os.path.join(UPLOAD_FOLDER, file_filename))
+        active = 1 if request.form.get('active') == 'on' else 0
+        cursor.execute('''UPDATE onboarding_forms
+                          SET title=%s, description=%s, form_type=%s, content=%s,
+                              file_filename=%s, required_for=%s, sort_order=%s, active=%s
+                          WHERE id=%s''',
+                       (request.form['title'],
+                        request.form.get('description', ''),
+                        request.form.get('form_type', 'custom'),
+                        request.form.get('content', ''),
+                        file_filename,
+                        request.form.get('required_for', 'both'),
+                        int(request.form.get('sort_order', 1)),
+                        active, form_id))
+        conn.commit()
+        conn.close()
+        return redirect('/onboarding-forms')
+
+    conn.close()
+    type_options = ''
+    for val, label in [('nca','NCA / Non-Compete'),('policy','Company Policy'),('w4','W-4'),('w9','W-9'),('i9','I-9'),('custom','Other / Custom')]:
+        sel = 'selected' if form['form_type'] == val else ''
+        type_options += f'<option value="{val}" {sel}>{label}</option>'
+    req_options = ''
+    for val, label in [('both','Both'),('employee','Employees Only'),('contractor','Contractors Only')]:
+        sel = 'selected' if form['required_for'] == val else ''
+        req_options += f'<option value="{val}" {sel}>{label}</option>'
+    active_checked = 'checked' if form['active'] else ''
+    file_note = f'<p class="form-note">Current file: {form["file_filename"]}</p>' if form['file_filename'] else ''
+
+    return STYLE + ONBOARDING_STYLE + admin_nav() + f'''
+    <h1>Edit: {form["title"]}</h1>
+    <form method="POST" enctype="multipart/form-data">
+        <label>Form Title:</label>
+        <input type="text" name="title" required value="{form['title']}">
+        <label>Form Type:</label>
+        <select name="form_type">{type_options}</select>
+        <label>Required For:</label>
+        <select name="required_for">{req_options}</select>
+        <label>Display Order:</label>
+        <input type="number" name="sort_order" value="{form['sort_order'] or 1}" min="1" max="20">
+        <label>Description:</label>
+        <textarea name="description" rows="2">{form['description'] or ''}</textarea>
+        <label>Document Text:</label>
+        <textarea name="content" rows="12">{form['content'] or ''}</textarea>
+        <label>Upload New File (optional):</label>
+        <div class="upload-area">
+            <input type="file" name="form_file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg">
+            {file_note}
+        </div>
+        <label style="font-weight:normal;">
+            <input type="checkbox" name="active" {active_checked} style="width:auto;margin-right:8px;">
+            Active (visible to new hires)
+        </label>
+        <button class="btn btn-success" type="submit">Save Changes</button>
+        <a class="btn" href="/onboarding-forms" style="background:#95a5a6;">Cancel</a>
+    </form>
+    '''
+
+
+@app.route('/onboarding-forms/<int:form_id>/delete', methods=['POST'])
+@login_required
+def delete_onboarding_form(form_id):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM onboarding_signatures WHERE form_id = %s', (form_id,))
+    cursor.execute('DELETE FROM onboarding_forms WHERE id = %s', (form_id,))
+    conn.commit()
+    conn.close()
+    return redirect('/onboarding-forms')
+
+
+@app.route('/onboarding-file/<filename>')
+@login_required
+def view_onboarding_file(filename):
+    return send_from_directory(UPLOAD_FOLDER, filename)
+
+
+# ---- ADMIN: VIEW TRAINEE ONBOARDING STATUS ----
+
+@app.route('/trainee/<int:trainee_id>/onboarding')
+@login_required
+def trainee_onboarding_status(trainee_id):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT trainees.*, candidates.first_name, candidates.last_name
+        FROM trainees LEFT JOIN candidates ON trainees.candidate_id = candidates.id
+        WHERE trainees.id = %s
+    ''', (trainee_id,))
+    t = cursor.fetchone()
+    if not t:
+        conn.close()
+        return redirect('/trainees')
+
+    cursor.execute('SELECT * FROM onboarding_forms WHERE active = 1 ORDER BY sort_order, created_date')
+    forms = cursor.fetchall()
+    cursor.execute('SELECT * FROM onboarding_signatures WHERE trainee_id = %s', (trainee_id,))
+    sigs = {s['form_id']: s for s in cursor.fetchall()}
+    conn.close()
+
+    total = len(forms)
+    signed = sum(1 for f in forms if f['id'] in sigs)
+    pct = int((signed / total * 100)) if total else 0
+
+    html = STYLE + ONBOARDING_STYLE + admin_nav()
+    html += f'<h1>Onboarding Status: {t["first_name"]} {t["last_name"]}</h1>'
+    html += f'''
+    <div class="application">
+        <p><strong>Email:</strong> {t["email"]}</p>
+        <p><strong>Progress:</strong> {signed}/{total} forms signed</p>
+        <div class="progress-bar"><div class="progress-fill" style="width:{pct}%"></div></div>
+        {"<p><strong style='color:#27ae60;'>✅ Fully Onboarded!</strong></p>" if signed == total and total > 0 else "<p><strong style='color:#f39c12;'>⏳ Onboarding in progress</strong></p>"}
+    </div>
+    '''
+    for f in forms:
+        sig = sigs.get(f['id'])
+        if sig:
+            status_html = f'<span class="status-label status-passed">SIGNED — {sig["signed_name"]} on {str(sig["signed_date"])[:10]}</span>'
+            card_class = 'onboard-step complete'
+        else:
+            status_html = '<span class="status-label status-not-started">Not Signed Yet</span>'
+            card_class = 'onboard-step pending'
+        html += f'''
+        <div class="{card_class}">
+            <h3>{f["title"]}</h3>
+            <p>{status_html}</p>
+            {f'<p class="form-note">IP recorded: {sig["ip_address"]}</p>' if sig and sig.get("ip_address") else ''}
+        </div>
+        '''
+    html += f'<p><a class="btn" href="/trainee/{trainee_id}">Back to Trainee Profile</a></p>'
+    return html
+
+
+# ---- TRAINEE: ONBOARDING PORTAL ----
+
+@app.route('/onboarding')
+@trainee_required
+def trainee_onboarding():
+    trainee_id = session.get('trainee_id')
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT trainees.*, candidates.first_name, candidates.last_name
+        FROM trainees LEFT JOIN candidates ON trainees.candidate_id = candidates.id
+        WHERE trainees.id = %s
+    ''', (trainee_id,))
+    trainee = cursor.fetchone()
+    cursor.execute('SELECT * FROM onboarding_forms WHERE active = 1 ORDER BY sort_order, created_date')
+    forms = cursor.fetchall()
+    cursor.execute('SELECT * FROM onboarding_signatures WHERE trainee_id = %s', (trainee_id,))
+    sigs = {s['form_id']: s for s in cursor.fetchall()}
+    conn.close()
+
+    total = len(forms)
+    signed = sum(1 for f in forms if f['id'] in sigs)
+    pct = int((signed / total * 100)) if total else 0
+    name = trainee['first_name'] if trainee else 'Team Member'
+
+    html = STYLE + ONBOARDING_STYLE + onboarding_nav()
+    html += f'<h1>Welcome, {name}! — Onboarding</h1>'
+
+    if total == 0:
+        html += '<div class="info"><p>No onboarding documents set up yet. Check back soon!</p></div>'
+        return html
+
+    if signed == total:
+        html += '<div class="success"><h2 style="margin-top:0;">🎉 Onboarding Complete!</h2><p>You have signed all required documents. You are ready to start!</p></div>'
+    else:
+        html += f'''
+        <div class="info">
+            <strong>Progress: {signed} of {total} documents signed</strong>
+            <div class="progress-bar"><div class="progress-fill" style="width:{pct}%"></div></div>
+            <p style="margin:5px 0 0;">Please read and sign each document below.</p>
+        </div>
+        '''
+
+    for i, f in enumerate(forms, 1):
+        sig = sigs.get(f['id'])
+        if sig:
+            card_class = 'onboard-step complete'
+            step_class = 'complete'
+            action_html = f'<p><span class="status-label status-passed">✅ Signed by {sig["signed_name"]} on {str(sig["signed_date"])[:10]}</span></p>'
+        else:
+            card_class = 'onboard-step pending'
+            step_class = 'pending'
+            action_html = f'<a class="btn btn-success" href="/onboarding/{f["id"]}/sign">Read & Sign →</a>'
+
+        html += f'''
+        <div class="{card_class}">
+            <h2><span class="step-number {step_class}">{i}</span>{f["title"]}</h2>
+            <p>{f["description"] or ""}</p>
+            {action_html}
+        </div>
+        '''
+    return html
+
+
+@app.route('/onboarding/<int:form_id>/sign', methods=['GET', 'POST'])
+@trainee_required
+def sign_onboarding_form(form_id):
+    trainee_id = session.get('trainee_id')
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM onboarding_forms WHERE id = %s AND active = 1', (form_id,))
+    form = cursor.fetchone()
+    if not form:
+        conn.close()
+        return redirect('/onboarding')
+
+    cursor.execute('''
+        SELECT trainees.*, candidates.first_name, candidates.last_name
+        FROM trainees LEFT JOIN candidates ON trainees.candidate_id = candidates.id
+        WHERE trainees.id = %s
+    ''', (trainee_id,))
+    trainee = cursor.fetchone()
+
+    cursor.execute('SELECT * FROM onboarding_signatures WHERE trainee_id = %s AND form_id = %s',
+                   (trainee_id, form_id))
+    existing_sig = cursor.fetchone()
+
+    if request.method == 'POST':
+        signed_name = request.form.get('signed_name', '').strip()
+        ip = request.remote_addr
+        if not signed_name:
+            conn.close()
+            return redirect(f'/onboarding/{form_id}/sign')
+        if existing_sig:
+            cursor.execute('''UPDATE onboarding_signatures
+                              SET signed_name=%s, signed_date=NOW(), ip_address=%s
+                              WHERE id=%s''',
+                           (signed_name, ip, existing_sig['id']))
+        else:
+            cursor.execute('''INSERT INTO onboarding_signatures
+                              (trainee_id, form_id, signed_name, ip_address)
+                              VALUES (%s, %s, %s, %s)''',
+                           (trainee_id, form_id, signed_name, ip))
+        conn.commit()
+        conn.close()
+        return redirect('/onboarding')
+
+    conn.close()
+    full_name = f'{trainee["first_name"]} {trainee["last_name"]}' if trainee else ''
+    already_signed = f'<div class="success">You already signed this on {str(existing_sig["signed_date"])[:10]}. You can re-sign below to update.</div>' if existing_sig else ''
+
+    if form['file_filename']:
+        ext = form['file_filename'].lower()
+        if ext.endswith('.pdf'):
+            content_html = f'<div class="doc-box"><p>📄 <a href="/onboarding-file-trainee/{form["file_filename"]}" target="_blank" style="color:#3498db;">Click here to open and read the document (PDF)</a></p></div>'
+        elif any(ext.endswith(e) for e in ['.png', '.jpg', '.jpeg']):
+            content_html = f'<div class="doc-box"><img src="/onboarding-file-trainee/{form["file_filename"]}" style="max-width:100%;"></div>'
+        else:
+            content_html = f'<div class="doc-box"><p>📎 <a href="/onboarding-file-trainee/{form["file_filename"]}" target="_blank" style="color:#3498db;">Download and read the document</a></p></div>'
+    elif form['content']:
+        content_html = f'<div class="doc-box">{form["content"]}</div>'
+    else:
+        content_html = '<div class="doc-box"><p>No document content provided.</p></div>'
+
+    return STYLE + ONBOARDING_STYLE + onboarding_nav() + f'''
+    <h1>📄 {form["title"]}</h1>
+    {already_signed}
+    <p class="form-note">{form["description"] or ""}</p>
+    {content_html}
+    <div class="sign-box">
+        <h3>✍️ Electronic Signature</h3>
+        <p style="font-size:13px;color:#856404;margin-bottom:10px;">
+            By typing your full legal name and clicking "I Agree & Sign", you confirm you have read
+            this document and agree to its terms. This is a legally binding electronic signature.
+            Your name, date, and IP address will be recorded.
+        </p>
+        <form method="POST">
+            <label>Type your full legal name to sign:</label>
+            <input type="text" name="signed_name" required placeholder="Your full legal name" value="{full_name}">
+            <button class="btn btn-success" type="submit" style="margin-top:10px;">✅ I Agree & Sign</button>
+            <a class="btn" href="/onboarding" style="background:#95a5a6;margin-left:10px;">Cancel</a>
+        </form>
+    </div>
+    '''
+
+
+@app.route('/onboarding-file-trainee/<filename>')
+@trainee_required
+def view_onboarding_file_trainee(filename):
+    return send_from_directory(UPLOAD_FOLDER, filename)
 
 
 if __name__ == '__main__':
