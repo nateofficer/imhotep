@@ -1339,10 +1339,7 @@ ONBOARDING_STYLE = '''
 '''
 
 
-def try:
-    init_onboarding_db()
-except Exception as e:
-    print(f"Onboarding DB init warning: {e}"):
+def init_onboarding_db():
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
