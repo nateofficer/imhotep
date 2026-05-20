@@ -165,7 +165,10 @@ def init_db():
 
 
 # Initialize database on startup
-init_db()
+try:
+    init_db()
+except Exception as e:
+    print(f"DB init warning: {e}")
 
 
 def login_required(f):
@@ -1336,7 +1339,10 @@ ONBOARDING_STYLE = '''
 '''
 
 
-def init_onboarding_db():
+def try:
+    init_onboarding_db()
+except Exception as e:
+    print(f"Onboarding DB init warning: {e}"):
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
@@ -1369,7 +1375,10 @@ def init_onboarding_db():
     conn.commit()
     conn.close()
 
-init_onboarding_db()
+try:
+    init_onboarding_db()
+except Exception as e:
+    print(f"Onboarding DB init warning: {e}")
 
 
 # ---- ADMIN: MANAGE ONBOARDING FORMS ----
