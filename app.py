@@ -280,6 +280,7 @@ def public_nav():
     return '''
     <div class="nav">
         <a href="/">View Jobs</a>
+        <a href="/quote">Request a Quote</a>
         <a href="/login">Admin Login</a>
         <a href="/trainee-login">Trainee Login</a>
     </div>
@@ -291,6 +292,7 @@ def admin_nav():
     <div class="nav">
         <a href="/">View Jobs</a>
         <a href="/applications">Applications</a>
+        <a href="/crm">CRM</a>
         <a href="/post-job">Post a Job</a>
         <a href="/training-modules">Training</a>
         <a href="/onboarding-forms">Onboarding</a>
@@ -1787,6 +1789,284 @@ def sign_onboarding_form(form_id):
 @trainee_required
 def view_onboarding_file_trainee(filename):
     return send_from_directory(UPLOAD_FOLDER, filename)
+
+
+# ============ CRM MODULE ============
+
+def init_crm_db():
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS leads (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            first_name VARCHAR(100) NOT NULL,
+            last_name VARCHAR(100) NOT NULL,
+            phone VARCHAR(50),
+            email VARCHAR(255),
+            address TEXT,
+            service_type VARCHAR(100),
+            status VARCHAR(20) DEFAULT 'new',
+            notes TEXT,
+            created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+try:
+    init_crm_db()
+except Exception as e:
+    print(f"CRM DB init warning: {e}")
+
+
+SERVICE_TYPES = [
+    'Regular House Cleaning',
+    'Deep Cleaning',
+    'Move-In Cleaning',
+    'Move-Out Cleaning',
+    'Office / Commercial Cleaning',
+    'Short-Term Rental / Airbnb Turnover',
+    'Post-Construction Cleaning',
+    'Other',
+]
+
+STATUS_LABELS = {
+    'new': ('New', '#3498db'),
+    'in_progress': ('In Progress', '#f39c12'),
+    'done': ('Done', '#27ae60'),
+}
+
+
+def status_badge(status):
+    label, color = STATUS_LABELS.get(status, ('Unknown', '#95a5a6'))
+    return f'<span style="background:{color};color:white;padding:3px 10px;border-radius:4px;font-size:12px;font-weight:bold;">{label}</span>'
+
+
+@app.route('/crm')
+@login_required
+def crm_list():
+    status_filter = request.args.get('status', 'all')
+    conn = get_db()
+    cursor = conn.cursor()
+    if status_filter != 'all':
+        cursor.execute('SELECT * FROM leads WHERE status = %s ORDER BY created_date DESC', (status_filter,))
+    else:
+        cursor.execute('SELECT * FROM leads ORDER BY created_date DESC')
+    leads = cursor.fetchall()
+    cursor.execute('SELECT status, COUNT(*) as cnt FROM leads GROUP BY status')
+    counts = {row['status']: row['cnt'] for row in cursor.fetchall()}
+    total = sum(counts.values())
+    conn.close()
+
+    new_count = counts.get('new', 0)
+    inprog_count = counts.get('in_progress', 0)
+    done_count = counts.get('done', 0)
+
+    filter_links = f'''
+    <div style="margin-bottom:15px;">
+        <a href="/crm" style="margin-right:10px;color:#3498db;font-weight:bold;">All ({total})</a>
+        <a href="/crm?status=new" style="margin-right:10px;color:#3498db;">New ({new_count})</a>
+        <a href="/crm?status=in_progress" style="margin-right:10px;color:#f39c12;">In Progress ({inprog_count})</a>
+        <a href="/crm?status=done" style="color:#27ae60;">Done ({done_count})</a>
+    </div>
+    '''
+
+    html = STYLE + admin_nav() + '<h1>CRM - Leads</h1>'
+    html += filter_links
+    html += '<p><a class="btn btn-success" href="/crm/new">+ Add Lead</a></p>'
+
+    if not leads:
+        html += '<div class="info"><p>No leads yet. Add one manually or share your quote request link with customers: <strong>/quote</strong></p></div>'
+    else:
+        for lead in leads:
+            html += f'''
+            <div class="application">
+                <h2>{lead["first_name"]} {lead["last_name"]} {status_badge(lead["status"])}</h2>
+                <p><strong>Service:</strong> {lead["service_type"] or "Not specified"} &nbsp;|&nbsp;
+                   <strong>Phone:</strong> {lead["phone"] or "N/A"} &nbsp;|&nbsp;
+                   <strong>Email:</strong> {lead["email"] or "N/A"}</p>
+                <p><strong>Address:</strong> {lead["address"] or "Not provided"}</p>
+                {f"<p><strong>Notes:</strong> {lead['notes']}</p>" if lead["notes"] else ""}
+                <p class="form-note">Added: {str(lead["created_date"])[:10]}</p>
+                <a class="btn" href="/crm/{lead["id"]}/edit">Edit / Update</a>
+                <form method="POST" action="/crm/{lead["id"]}/delete" onsubmit="return confirm('Delete this lead?');"
+                      style="display:inline-block;margin-top:10px;box-shadow:none;padding:0;background:none;">
+                    <button class="btn btn-danger" type="submit">Delete</button>
+                </form>
+            </div>
+            '''
+    return html
+
+
+@app.route('/crm/new', methods=['GET', 'POST'])
+@login_required
+def crm_new():
+    if request.method == 'POST':
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('''INSERT INTO leads
+                          (first_name, last_name, phone, email, address, service_type, status, notes)
+                          VALUES (%s, %s, %s, %s, %s, %s, %s, %s)''',
+                       (request.form['first_name'], request.form['last_name'],
+                        request.form.get('phone', ''), request.form.get('email', ''),
+                        request.form.get('address', ''), request.form.get('service_type', ''),
+                        request.form.get('status', 'new'), request.form.get('notes', '')))
+        conn.commit()
+        conn.close()
+        return redirect('/crm')
+
+    service_options = ''.join(f'<option value="{s}">{s}</option>' for s in SERVICE_TYPES)
+    return STYLE + admin_nav() + f'''
+    <h1>Add New Lead</h1>
+    <form method="POST">
+        <label>First Name:</label>
+        <input type="text" name="first_name" required>
+        <label>Last Name:</label>
+        <input type="text" name="last_name" required>
+        <label>Phone:</label>
+        <input type="tel" name="phone">
+        <label>Email:</label>
+        <input type="email" name="email">
+        <label>Address:</label>
+        <input type="text" name="address" placeholder="Street, City, State">
+        <label>Service Type:</label>
+        <select name="service_type">
+            <option value="">-- Select service --</option>
+            {service_options}
+        </select>
+        <label>Status:</label>
+        <select name="status">
+            <option value="new">New</option>
+            <option value="in_progress">In Progress</option>
+            <option value="done">Done</option>
+        </select>
+        <label>Notes:</label>
+        <textarea name="notes" rows="3" placeholder="Any notes about this lead..."></textarea>
+        <button class="btn btn-success" type="submit">Save Lead</button>
+        <a class="btn" href="/crm" style="background:#95a5a6;">Cancel</a>
+    </form>
+    '''
+
+
+@app.route('/crm/<int:lead_id>/edit', methods=['GET', 'POST'])
+@login_required
+def crm_edit(lead_id):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM leads WHERE id = %s', (lead_id,))
+    lead = cursor.fetchone()
+    if not lead:
+        conn.close()
+        return redirect('/crm')
+
+    if request.method == 'POST':
+        cursor.execute('''UPDATE leads SET first_name=%s, last_name=%s, phone=%s, email=%s,
+                          address=%s, service_type=%s, status=%s, notes=%s WHERE id=%s''',
+                       (request.form['first_name'], request.form['last_name'],
+                        request.form.get('phone', ''), request.form.get('email', ''),
+                        request.form.get('address', ''), request.form.get('service_type', ''),
+                        request.form.get('status', 'new'), request.form.get('notes', ''), lead_id))
+        conn.commit()
+        conn.close()
+        return redirect('/crm')
+
+    conn.close()
+    service_options = ''
+    for s in SERVICE_TYPES:
+        sel = 'selected' if lead['service_type'] == s else ''
+        service_options += f'<option value="{s}" {sel}>{s}</option>'
+    status_options = ''
+    for val, (label, color) in STATUS_LABELS.items():
+        sel = 'selected' if lead['status'] == val else ''
+        status_options += f'<option value="{val}" {sel}>{label}</option>'
+
+    return STYLE + admin_nav() + f'''
+    <h1>Edit Lead: {lead["first_name"]} {lead["last_name"]}</h1>
+    <form method="POST">
+        <label>First Name:</label>
+        <input type="text" name="first_name" required value="{lead['first_name']}">
+        <label>Last Name:</label>
+        <input type="text" name="last_name" required value="{lead['last_name']}">
+        <label>Phone:</label>
+        <input type="tel" name="phone" value="{lead['phone'] or ''}">
+        <label>Email:</label>
+        <input type="email" name="email" value="{lead['email'] or ''}">
+        <label>Address:</label>
+        <input type="text" name="address" value="{lead['address'] or ''}">
+        <label>Service Type:</label>
+        <select name="service_type">
+            <option value="">-- Select service --</option>
+            {service_options}
+        </select>
+        <label>Status:</label>
+        <select name="status">{status_options}</select>
+        <label>Notes:</label>
+        <textarea name="notes" rows="3">{lead['notes'] or ''}</textarea>
+        <button class="btn btn-success" type="submit">Save Changes</button>
+        <a class="btn" href="/crm" style="background:#95a5a6;">Cancel</a>
+    </form>
+    '''
+
+
+@app.route('/crm/<int:lead_id>/delete', methods=['POST'])
+@login_required
+def crm_delete(lead_id):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM leads WHERE id = %s', (lead_id,))
+    conn.commit()
+    conn.close()
+    return redirect('/crm')
+
+
+@app.route('/quote', methods=['GET', 'POST'])
+def quote_request():
+    if request.method == 'POST':
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('''INSERT INTO leads
+                          (first_name, last_name, phone, email, address, service_type, status, notes)
+                          VALUES (%s, %s, %s, %s, %s, %s, 'new', %s)''',
+                       (request.form['first_name'], request.form['last_name'],
+                        request.form.get('phone', ''), request.form.get('email', ''),
+                        request.form.get('address', ''), request.form.get('service_type', ''),
+                        request.form.get('notes', '')))
+        conn.commit()
+        conn.close()
+        return STYLE + public_nav() + '''
+        <h1>Thank You!</h1>
+        <div class="success">
+            <p>We received your request! Casey\'s Cleaning Company will contact you within 24 hours with a quote.</p>
+        </div>
+        <a class="btn" href="/">Back to Home</a>
+        '''
+
+    service_options = ''.join(f'<option value="{s}">{s}</option>' for s in SERVICE_TYPES)
+    return STYLE + public_nav() + f'''
+    <h1>Request a Free Quote</h1>
+    <p class="form-note">Fill out the form below and we\'ll get back to you within 24 hours.</p>
+    <form method="POST">
+        <label>First Name:</label>
+        <input type="text" name="first_name" required>
+        <label>Last Name:</label>
+        <input type="text" name="last_name" required>
+        <label>Phone:</label>
+        <input type="tel" name="phone" required>
+        <label>Email:</label>
+        <input type="email" name="email">
+        <label>Service Address:</label>
+        <input type="text" name="address" required placeholder="Street address, Las Vegas NV">
+        <label>Type of Cleaning:</label>
+        <select name="service_type" required>
+            <option value="">-- Select --</option>
+            {service_options}
+        </select>
+        <label>Anything else we should know? (optional)</label>
+        <textarea name="notes" rows="3" placeholder="Number of bedrooms, pets, special requests..."></textarea>
+        <button class="btn btn-success" type="submit">Request Quote</button>
+    </form>
+    '''
 
 
 if __name__ == '__main__':
