@@ -2023,6 +2023,22 @@ def crm_delete(lead_id):
 @app.route('/quote', methods=['GET', 'POST'])
 def quote_request():
     if request.method == 'POST':
+        beds = request.form.get('beds', '3')
+        baths = request.form.get('baths', '2')
+        cleaning_type = request.form.get('cleaning_type', 'regular')
+        estimate = request.form.get('estimate', '')
+        notes_parts = []
+        if request.form.get('notes'):
+            notes_parts.append(request.form.get('notes'))
+        notes_parts.append(f'Bedrooms: {beds}, Bathrooms: {baths}, Type: {cleaning_type}, Estimate: {estimate}')
+        addons = []
+        for addon in ['fridge','oven','windows','laundry','garage','patio']:
+            if request.form.get(f'addon_{addon}'):
+                addons.append(addon)
+        if addons:
+            notes_parts.append(f'Add-ons: {", ".join(addons)}')
+        full_notes = ' | '.join(notes_parts)
+
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''INSERT INTO leads
@@ -2030,42 +2046,151 @@ def quote_request():
                           VALUES (%s, %s, %s, %s, %s, %s, 'new', %s)''',
                        (request.form['first_name'], request.form['last_name'],
                         request.form.get('phone', ''), request.form.get('email', ''),
-                        request.form.get('address', ''), request.form.get('service_type', ''),
-                        request.form.get('notes', '')))
+                        request.form.get('address', ''), cleaning_type, full_notes))
         conn.commit()
         conn.close()
-        return STYLE + public_nav() + '''
+        return STYLE + public_nav() + f'''
         <h1>Thank You!</h1>
         <div class="success">
-            <p>We received your request! Casey\'s Cleaning Company will contact you within 24 hours with a quote.</p>
+            <h2 style="margin-top:0;">We received your quote request!</h2>
+            <p>Your estimate: <strong>{estimate}</strong></p>
+            <p>Casey\'s Cleaning Company will contact you within 24 hours to confirm pricing and schedule your cleaning.</p>
+            <p class="form-note">Remember: final price is confirmed after our walkthrough — no surprises!</p>
         </div>
         <a class="btn" href="/">Back to Home</a>
         '''
 
-    service_options = ''.join(f'<option value="{s}">{s}</option>' for s in SERVICE_TYPES)
-    return STYLE + public_nav() + f'''
-    <h1>Request a Free Quote</h1>
-    <p class="form-note">Fill out the form below and we\'ll get back to you within 24 hours.</p>
-    <form method="POST">
-        <label>First Name:</label>
-        <input type="text" name="first_name" required>
-        <label>Last Name:</label>
-        <input type="text" name="last_name" required>
-        <label>Phone:</label>
-        <input type="tel" name="phone" required>
-        <label>Email:</label>
-        <input type="email" name="email">
-        <label>Service Address:</label>
-        <input type="text" name="address" required placeholder="Street address, Las Vegas NV">
-        <label>Type of Cleaning:</label>
-        <select name="service_type" required>
-            <option value="">-- Select --</option>
-            {service_options}
+    return STYLE + public_nav() + '''
+    <h1>Get a Free Quote</h1>
+    <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:5px;padding:12px 16px;margin:10px 0;font-size:13px;color:#856404;">
+        <strong>Please note:</strong> These are estimated prices based on the information provided.
+        Final pricing will be confirmed by Casey\'s Cleaning Company after an on-site walkthrough.
+    </div>
+
+    <div class="application" style="margin-bottom:15px;">
+        <h2 style="margin-top:0;">Step 1 — Calculate Your Estimate</h2>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-bottom:15px;">
+            <div>
+                <label>Bedrooms: <span id="beds-out" style="color:#3498db;font-weight:bold;">3</span></label>
+                <input type="range" min="1" max="6" value="3" id="beds" step="1" style="width:100%;margin:5px 0;">
+            </div>
+            <div>
+                <label>Bathrooms: <span id="baths-out" style="color:#3498db;font-weight:bold;">2</span></label>
+                <input type="range" min="1" max="5" value="2" id="baths" step="1" style="width:100%;margin:5px 0;">
+            </div>
+        </div>
+
+        <label>Cleaning Type:</label>
+        <select id="calc-type" style="margin-bottom:15px;">
+            <option value="regular">Regular Cleaning</option>
+            <option value="deep">Deep Cleaning (+$60)</option>
+            <option value="moveout">Move-Out / Move-In (+$160)</option>
         </select>
-        <label>Anything else we should know? (optional)</label>
-        <textarea name="notes" rows="3" placeholder="Number of bedrooms, pets, special requests..."></textarea>
-        <button class="btn btn-success" type="submit">Request Quote</button>
-    </form>
+
+        <label>Add-Ons (optional):</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0 15px;">
+            <label style="font-weight:normal;display:flex;align-items:center;gap:8px;">
+                <input type="checkbox" id="c-fridge"> Inside fridge <span style="color:#7f8c8d;font-size:12px;">(+$25)</span>
+            </label>
+            <label style="font-weight:normal;display:flex;align-items:center;gap:8px;">
+                <input type="checkbox" id="c-oven"> Inside oven <span style="color:#7f8c8d;font-size:12px;">(+$25)</span>
+            </label>
+            <label style="font-weight:normal;display:flex;align-items:center;gap:8px;">
+                <input type="checkbox" id="c-windows"> Interior windows <span style="color:#7f8c8d;font-size:12px;">(+$30)</span>
+            </label>
+            <label style="font-weight:normal;display:flex;align-items:center;gap:8px;">
+                <input type="checkbox" id="c-laundry"> Laundry wash+fold <span style="color:#7f8c8d;font-size:12px;">(+$20)</span>
+            </label>
+            <label style="font-weight:normal;display:flex;align-items:center;gap:8px;">
+                <input type="checkbox" id="c-garage"> Garage sweep <span style="color:#7f8c8d;font-size:12px;">(+$35)</span>
+            </label>
+            <label style="font-weight:normal;display:flex;align-items:center;gap:8px;">
+                <input type="checkbox" id="c-patio"> Patio / balcony <span style="color:#7f8c8d;font-size:12px;">(+$20)</span>
+            </label>
+        </div>
+
+        <div style="background:#d4edda;border-radius:5px;padding:15px;text-align:center;">
+            <div style="font-size:13px;color:#155724;margin-bottom:4px;">your estimate</div>
+            <div style="font-size:32px;font-weight:bold;color:#155724;" id="calc-result">$181 – $200</div>
+            <div style="font-size:12px;color:#155724;margin-top:4px;">final price confirmed after on-site walkthrough</div>
+        </div>
+    </div>
+
+    <div class="application">
+        <h2 style="margin-top:0;">Step 2 — Request Your Quote</h2>
+        <form method="POST">
+            <input type="hidden" name="beds" id="form-beds" value="3">
+            <input type="hidden" name="baths" id="form-baths" value="2">
+            <input type="hidden" name="cleaning_type" id="form-type" value="regular">
+            <input type="hidden" name="estimate" id="form-estimate" value="$181 - $200">
+            <input type="hidden" name="addon_fridge" id="form-fridge" value="">
+            <input type="hidden" name="addon_oven" id="form-oven" value="">
+            <input type="hidden" name="addon_windows" id="form-windows" value="">
+            <input type="hidden" name="addon_laundry" id="form-laundry" value="">
+            <input type="hidden" name="addon_garage" id="form-garage" value="">
+            <input type="hidden" name="addon_patio" id="form-patio" value="">
+
+            <label>First Name:</label>
+            <input type="text" name="first_name" required>
+            <label>Last Name:</label>
+            <input type="text" name="last_name" required>
+            <label>Phone:</label>
+            <input type="tel" name="phone" required>
+            <label>Email:</label>
+            <input type="email" name="email">
+            <label>Service Address:</label>
+            <input type="text" name="address" required placeholder="Street address, Las Vegas NV">
+            <label>Anything else we should know? (optional)</label>
+            <textarea name="notes" rows="3" placeholder="Pets, gate codes, special requests..."></textarea>
+
+            <div style="background:#fff3cd;border-radius:5px;padding:10px;font-size:12px;color:#856404;margin:10px 0;">
+                <strong>Disclaimer:</strong> These prices are estimates based on average Las Vegas market rates.
+                Actual pricing may vary based on home condition, clutter level, and special requirements.
+                A Casey\'s Cleaning Company representative will confirm the final price before any work begins.
+            </div>
+
+            <button class="btn btn-success" type="submit" style="width:100%;font-size:18px;padding:15px;">
+                Submit Quote Request
+            </button>
+        </form>
+    </div>
+
+    <script>
+    const BED_BASE = 40, BATH_BASE = 25, BASE = 190, DEEP = 60, MOVEOUT = 160;
+    function calc() {
+        var beds = parseInt(document.getElementById("beds").value);
+        var baths = parseInt(document.getElementById("baths").value);
+        var type = document.getElementById("calc-type").value;
+        document.getElementById("beds-out").textContent = beds;
+        document.getElementById("baths-out").textContent = baths;
+        document.getElementById("form-beds").value = beds;
+        document.getElementById("form-baths").value = baths;
+        document.getElementById("form-type").value = type;
+        var base = BASE + (beds-3)*BED_BASE + (baths-2)*BATH_BASE;
+        if (base < 80) base = 80;
+        var addon = 0;
+        if (type === "deep") addon = DEEP;
+        if (type === "moveout") addon = MOVEOUT;
+        var extras = [["c-fridge",25,"fridge"],["c-oven",25,"oven"],["c-windows",30,"windows"],
+                      ["c-laundry",20,"laundry"],["c-garage",35,"garage"],["c-patio",20,"patio"]];
+        extras.forEach(function(e) {
+            var cb = document.getElementById(e[0]);
+            if (cb.checked) { addon += e[1]; document.getElementById("form-"+e[2]).value = "yes"; }
+            else { document.getElementById("form-"+e[2]).value = ""; }
+        });
+        var total = base + addon;
+        var low = Math.round(total * 0.95);
+        var high = Math.round(total * 1.05);
+        var range = "$" + low + " - $" + high;
+        document.getElementById("calc-result").textContent = "$" + low + " \u2013 $" + high;
+        document.getElementById("form-estimate").value = range;
+    }
+    ["beds","baths","calc-type","c-fridge","c-oven","c-windows","c-laundry","c-garage","c-patio"].forEach(function(id) {
+        document.getElementById(id).addEventListener("input", calc);
+        document.getElementById(id).addEventListener("change", calc);
+    });
+    calc();
+    </script>
     '''
 
 
