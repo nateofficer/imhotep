@@ -22,6 +22,16 @@ ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'changeme')
 # Upload folder
 UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+import cloudinary
+import cloudinary.uploader
+
+cloudinary.config(
+    cloud_name="dy48z1wnj",
+    api_key="526198438561634",
+    api_secret="GYhG6NcLfeW_MD2Y_VsshUT34IU",
+    secure=True
+)
+
 
 # MySQL connection string from Railway
 MYSQL_URL = os.environ.get('MYSQL_URL', '')
@@ -1427,8 +1437,13 @@ def new_onboarding_form():
             f = request.files['form_file']
             if f and f.filename:
                 timestamp = str(int(time.time()))
-                file_filename = f"{timestamp}_form_{f.filename}"
-                f.save(os.path.join(UPLOAD_FOLDER, file_filename))
+                public_id = f"imhotep_forms/{timestamp}_form_{f.filename}"
+                result = cloudinary.uploader.upload(
+                    f,
+                    public_id=public_id,
+                    resource_type="raw"
+                )
+                file_filename = result['secure_url']
         cursor.execute('''INSERT INTO onboarding_forms
                           (title, description, form_type, content, file_filename, required_for, sort_order, active)
                           VALUES (%s, %s, %s, %s, %s, %s, %s, 1)''',
@@ -1504,8 +1519,13 @@ def edit_onboarding_form(form_id):
             f = request.files['form_file']
             if f and f.filename:
                 timestamp = str(int(time.time()))
-                file_filename = f"{timestamp}_form_{f.filename}"
-                f.save(os.path.join(UPLOAD_FOLDER, file_filename))
+                public_id = f"imhotep_forms/{timestamp}_form_{f.filename}"
+                result = cloudinary.uploader.upload(
+                    f,
+                    public_id=public_id,
+                    resource_type="raw"
+                )
+                file_filename = result['secure_url']
         active = 1 if request.form.get('active') == 'on' else 0
         cursor.execute('''UPDATE onboarding_forms
                           SET title=%s, description=%s, form_type=%s, content=%s,
