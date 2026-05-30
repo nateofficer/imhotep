@@ -1713,10 +1713,15 @@ def trainee_onboarding():
             step_class = 'pending'
             action_html = f'<a class="btn btn-success" href="/onboarding/{f["id"]}/sign">Read & Sign →</a>'
 
+        download_html = ''
+        if f['file_filename']:
+            download_html = f'<a class="btn" href="{f["file_filename"]}" target="_blank" style="background:#17a2b8;color:white;margin-right:8px;">⬇ Download Form</a>'
+
         html += f'''
         <div class="{card_class}">
             <h2><span class="step-number {step_class}">{i}</span>{f["title"]}</h2>
             <p>{f["description"] or ""}</p>
+            {download_html}
             {action_html}
         </div>
         '''
