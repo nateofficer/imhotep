@@ -1714,8 +1714,11 @@ def trainee_onboarding():
             action_html = f'<a class="btn btn-success" href="/onboarding/{f["id"]}/sign">Read & Sign →</a>'
 
         download_html = ''
-        if f['file_filename']:
-            download_html = f'<a class="btn" href="{f["file_filename"]}" target="_blank" style="background:#17a2b8;color:white;margin-right:8px;">⬇ Download Form</a>'
+        desc = f['description'] or ''
+        if desc.startswith('http'):
+            download_html = f'<a class="btn" href="{desc}" target="_blank" style="background:#17a2b8;color:white;margin-right:8px;display:inline-block;margin-bottom:8px;">⬇ Download Form</a>'
+        elif f['file_filename'] and f['file_filename'].startswith('http'):
+            download_html = f'<a class="btn" href="{f["file_filename"]}" target="_blank" style="background:#17a2b8;color:white;margin-right:8px;display:inline-block;margin-bottom:8px;">⬇ Download Form</a>'
 
         html += f'''
         <div class="{card_class}">
