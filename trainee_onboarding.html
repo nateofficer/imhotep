@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Onboarding – Imhotep</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --sand:        #FAF7F2;
+    --cream:       #FFF9F0;
+    --warm-brown:  #5C3D2E;
+    --terracotta:  #C4714A;
+    --terra-light: #E8957A;
+    --sage:        #7A9E7E;
+    --sage-light:  #B5CEB8;
+    --gold:        #D4A843;
+    --text:        #2E1F16;
+    --text-muted:  #7A6358;
+    --border:      #E8DDD5;
+    --white:       #FFFFFF;
+    --shadow:      0 2px 12px rgba(92,61,46,0.08);
+    --shadow-md:   0 4px 24px rgba(92,61,46,0.12);
+  }
+
+  body {
+    font-family: 'Nunito', sans-serif;
+    background: var(--sand);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+  }
+
+  /* ── NAVBAR ── */
+  .navbar {
+    background: var(--warm-brown);
+    padding: 0 32px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .navbar-brand {
+    font-family: 'Lora', serif;
+    font-size: 20px;
+    color: var(--cream);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-decoration: none;
+  }
+  .navbar-brand span { color: var(--gold); }
+  .navbar-links { display: flex; align-items: center; gap: 4px; }
+  .navbar-links a {
+    font-size: 13px;
+    font-weight: 700;
+    color: rgba(255,249,240,0.72);
+    text-decoration: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    transition: background 0.2s, color 0.2s;
+  }
+  .navbar-links a:hover,
+  .navbar-links a.active {
+    background: rgba(255,255,255,0.1);
+    color: var(--cream);
+  }
+  .navbar-right { display: flex; align-items: center; gap: 12px; }
+  .navbar-user { font-size: 13px; color: rgba(255,249,240,0.72); }
+  .navbar-avatar {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: var(--terracotta);
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-weight: 800; font-size: 12px;
+    flex-shrink: 0;
+  }
+  .trainee-badge {
+    background: var(--terracotta);
+    color: white;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 20px;
+    letter-spacing: 0.5px;
+  }
+
+  /* ── PROGRESS HEADER ── */
+  .progress-header {
+    background: var(--cream);
+    border-bottom: 1px solid var(--border);
+    padding: 20px 32px;
+  }
+  .progress-title {
+    font-family: 'Lora', serif;
+    font-size: 22px; font-weight: 600;
+    color: var(--warm-brown);
+    margin-bottom: 3px;
+  }
+  .progress-subtitle { font-size: 13px; color: var(--text-muted); margin-bottom: 14px; }
+
+  /* Progress bar */
+  .progress-track {
+    background: var(--border);
+    border-radius: 10px;
+    height: 8px;
+    overflow: hidden;
+    margin-bottom: 6px;
+  }
+  .progress-fill {
+    height: 100%;
+    border-radius: 10px;
+    background: linear-gradient(90deg, var(--sage), var(--terracotta));
+    transition: width 0.5s ease;
+  }
+  .progress-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-muted);
+  }
+  .progress-label span { color: var(--warm-brown); }
+
+  /* ── MAIN ── */
+  .main {
+    max-width: 760px;
+    margin: 32px auto;
+    padding: 0 24px 60px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  /* ── WELCOME BANNER ── */
+  .welcome-banner {
+    background: linear-gradient(135deg, var(--warm-brown) 0%, #8B5E3C 100%);
+    border-radius: 16px;
+    padding: 26px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    overflow: hidden;
+    position: relative;
+    animation: fadeUp 0.35s ease both;
+  }
+  .welcome-banner::before {
+    content: '';
+    position: absolute; right: -20px; top: -20px;
+    width: 160px; height: 160px; border-radius: 50%;
+    background: rgba(255,255,255,0.05);
+  }
+  .welcome-banner::after {
+    content: '';
+    position: absolute; right: 60px; bottom: -40px;
+    width: 110px; height: 110px; border-radius: 50%;
+    background: rgba(255,255,255,0.04);
+  }
+  .welcome-text h2 {
+    font-family: 'Lora', serif;
+    font-size: 19px;
+    color: var(--cream);
+    margin-bottom: 5px;
+  }
+  .welcome-text p {
+    font-size: 13px;
+    color: rgba(255,249,240,0.72);
+    line-height: 1.6;
+    max-width: 360px;
+  }
+  .welcome-icon { font-size: 48px; z-index: 1; flex-shrink: 0; }
+
+  /* ── SUCCESS BANNER ── */
+  .success-banner {
+    background: linear-gradient(135deg, var(--sage) 0%, #5a8a5e 100%);
+    border-radius: 16px;
+    padding: 26px 32px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    animation: fadeUp 0.35s ease both;
+  }
+  .success-icon { font-size: 40px; flex-shrink: 0; }
+  .success-text h2 {
+    font-family: 'Lora', serif;
+    font-size: 19px;
+    color: white;
+    margin-bottom: 4px;
+  }
+  .success-text p { font-size: 13px; color: rgba(255,255,255,0.82); line-height: 1.6; }
+
+  /* ── INFO BANNER ── */
+  .info-banner {
+    background: var(--cream);
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+    font-size: 13px;
+    color: var(--text-muted);
+    text-align: center;
+    animation: fadeUp 0.35s ease both;
+  }
+
+  /* ── FORM CARDS ── */
+  .form-card {
+    background: var(--white);
+    border-radius: 14px;
+    border: 1.5px solid var(--border);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    animation: fadeUp 0.4s ease both;
+  }
+  .form-card:hover { box-shadow: var(--shadow-md); }
+  .form-card.complete { border-color: var(--sage-light); }
+  .form-card.pending  { border-color: var(--border); }
+
+  /* stagger animation */
+  .form-card:nth-child(1) { animation-delay: 0.05s; }
+  .form-card:nth-child(2) { animation-delay: 0.10s; }
+  .form-card:nth-child(3) { animation-delay: 0.15s; }
+  .form-card:nth-child(4) { animation-delay: 0.20s; }
+  .form-card:nth-child(5) { animation-delay: 0.25s; }
+
+  .card-inner {
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  /* Step circle */
+  .step-circle {
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 800;
+    flex-shrink: 0;
+  }
+  .step-circle.complete {
+    background: rgba(122,158,126,0.15);
+    color: var(--sage);
+    border: 2px solid var(--sage-light);
+  }
+  .step-circle.pending {
+    background: rgba(196,113,74,0.1);
+    color: var(--terracotta);
+    border: 2px solid rgba(196,113,74,0.25);
+  }
+
+  /* Card content */
+  .card-content { flex: 1; min-width: 0; }
+  .card-title {
+    font-family: 'Lora', serif;
+    font-size: 15px; font-weight: 600;
+    color: var(--warm-brown);
+    margin-bottom: 3px;
+  }
+  .card-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.5;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Card action */
+  .card-action { flex-shrink: 0; }
+  .btn-sign {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 13px; font-weight: 800;
+    padding: 9px 18px;
+    border-radius: 8px;
+    background: var(--terracotta);
+    color: white;
+    text-decoration: none;
+    transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+    box-shadow: 0 2px 8px rgba(196,113,74,0.25);
+    white-space: nowrap;
+  }
+  .btn-sign:hover {
+    background: var(--warm-brown);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(92,61,46,0.25);
+  }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px; font-weight: 700;
+    padding: 6px 12px;
+    border-radius: 20px;
+    background: rgba(122,158,126,0.12);
+    color: var(--sage);
+    white-space: nowrap;
+  }
+
+  /* Signed detail strip */
+  .signed-detail {
+    padding: 10px 24px 14px 82px;
+    font-size: 11px;
+    color: var(--text-muted);
+    border-top: 1px solid rgba(122,158,126,0.15);
+    background: rgba(122,158,126,0.04);
+  }
+  .signed-detail span { color: var(--warm-brown); font-weight: 700; }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── LOGOUT LINK ── */
+  .logout-link {
+    color: rgba(255,249,240,0.55) !important;
+  }
+  .logout-link:hover {
+    color: var(--cream) !important;
+    background: rgba(255,80,50,0.15) !important;
+  }
+</style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+  <a class="navbar-brand" href="/onboarding">Imho<span>tep</span></a>
+  <div class="navbar-links">
+    <a href="/training">My Training</a>
+    <a href="/onboarding" class="active">My Onboarding</a>
+  </div>
+  <div class="navbar-right">
+    <span class="navbar-user">{{ name }}</span>
+    <div class="navbar-avatar">{{ name[0]|upper if name else 'T' }}</div>
+    <span class="trainee-badge">TRAINEE</span>
+    <a href="/trainee-logout" class="navbar-links logout-link" style="font-size:12px;padding:5px 10px;">Logout</a>
+  </div>
+</nav>
+
+<!-- PROGRESS HEADER -->
+<div class="progress-header">
+  <div class="progress-title">My Onboarding</div>
+  {% if total > 0 %}
+  <div class="progress-subtitle">
+    {% if signed == total %}
+      All documents signed — you're all set! 🎉
+    {% else %}
+      {{ signed }} of {{ total }} document{{ 's' if total != 1 }} signed. Please complete the remaining items below.
+    {% endif %}
+  </div>
+  <div class="progress-track">
+    <div class="progress-fill" style="width: {{ pct }}%"></div>
+  </div>
+  <div class="progress-label"><span>{{ pct }}%</span> complete</div>
+  {% else %}
+  <div class="progress-subtitle">Your onboarding documents will appear here once they're ready.</div>
+  {% endif %}
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  {% if total == 0 %}
+  <!-- No forms yet -->
+  <div class="info-banner">
+    <p>📋 No onboarding documents have been set up yet. Check back soon!</p>
+  </div>
+
+  {% elif signed == total %}
+  <!-- All complete -->
+  <div class="success-banner">
+    <div class="success-icon">🎉</div>
+    <div class="success-text">
+      <h2>Onboarding Complete!</h2>
+      <p>You've signed all required documents. Welcome to Casey's Cleaning Company — we're glad to have you on the team!</p>
+    </div>
+  </div>
+
+  {% else %}
+  <!-- In progress — welcome banner -->
+  <div class="welcome-banner">
+    <div class="welcome-text">
+      <h2>Welcome, {{ name }}! 👋</h2>
+      <p>Please read and sign each document below to complete your onboarding. Take your time with each one.</p>
+    </div>
+    <div class="welcome-icon">🧹</div>
+  </div>
+  {% endif %}
+
+  <!-- FORM CARDS -->
+  {% for f in forms %}
+  {% set sig = sigs.get(f['id']) %}
+  <div class="form-card {{ 'complete' if sig else 'pending' }}">
+    <div class="card-inner">
+
+      <!-- Step circle -->
+      <div class="step-circle {{ 'complete' if sig else 'pending' }}">
+        {% if sig %}✓{% else %}{{ loop.index }}{% endif %}
+      </div>
+
+      <!-- Content -->
+      <div class="card-content">
+        <div class="card-title">{{ f['title'] }}</div>
+        {% if f['description'] %}
+        <div class="card-desc">{{ f['description'] }}</div>
+        {% endif %}
+      </div>
+
+      <!-- Action -->
+      <div class="card-action">
+        {% if sig %}
+          <span class="status-badge">✓ Signed</span>
+        {% else %}
+          <a class="btn-sign" href="/onboarding/{{ f['id'] }}/sign">Read & Sign →</a>
+        {% endif %}
+      </div>
+
+    </div>
+
+    <!-- Signed detail strip -->
+    {% if sig %}
+    <div class="signed-detail">
+      Signed by <span>{{ sig['signed_name'] }}</span>
+      on <span>{{ sig['signed_date'].strftime('%b %d, %Y') if sig['signed_date'] else 'N/A' }}</span>
+    </div>
+    {% endif %}
+
+  </div>
+  {% endfor %}
+
+</div><!-- /main -->
+
+</body>
+</html>
