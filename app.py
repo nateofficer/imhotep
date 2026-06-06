@@ -1735,27 +1735,7 @@ def sign_onboarding_form(form_id):
     else:
         content_html = '<div class="doc-box"><p>No document content provided.</p></div>'
 
-    return STYLE + ONBOARDING_STYLE + onboarding_nav() + f'''
-    <h1>📄 {form["title"]}</h1>
-    {already_signed}
-    <p class="form-note">{form["description"] or ""}</p>
-    {content_html}
-    <div class="sign-box">
-        <h3>✍️ Electronic Signature</h3>
-        <p style="font-size:13px;color:#856404;margin-bottom:10px;">
-            By typing your full legal name and clicking "I Agree & Sign", you confirm you have read
-            this document and agree to its terms. This is a legally binding electronic signature.
-            Your name, date, and IP address will be recorded.
-        </p>
-        <form method="POST">
-            <label>Type your full legal name to sign:</label>
-            <input type="text" name="signed_name" required placeholder="Your full legal name" value="{full_name}">
-            <button class="btn btn-success" type="submit" style="margin-top:10px;">✅ I Agree & Sign</button>
-            <a class="btn" href="/onboarding" style="background:#95a5a6;margin-left:10px;">Cancel</a>
-        </form>
-    </div>
-    '''
-
+    return render_template('sign_onboarding_form.html', form=form, full_name=full_name, existing_sig=existing_sig)
 
 @app.route('/onboarding-file-trainee/<filename>')
 @trainee_required

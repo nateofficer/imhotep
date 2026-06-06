@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ form['title'] }} – Sign | Imhotep</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --sand:        #FAF7F2;
+    --cream:       #FFF9F0;
+    --warm-brown:  #5C3D2E;
+    --terracotta:  #C4714A;
+    --terra-light: #E8957A;
+    --sage:        #7A9E7E;
+    --sage-light:  #B5CEB8;
+    --gold:        #D4A843;
+    --text:        #2E1F16;
+    --text-muted:  #7A6358;
+    --border:      #E8DDD5;
+    --white:       #FFFFFF;
+    --shadow:      0 2px 12px rgba(92,61,46,0.08);
+    --shadow-md:   0 4px 24px rgba(92,61,46,0.12);
+  }
+
+  body {
+    font-family: 'Nunito', sans-serif;
+    background: var(--sand);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+  }
+
+  /* ── NAVBAR ── */
+  .navbar {
+    background: var(--warm-brown);
+    padding: 0 32px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .navbar-brand {
+    font-family: 'Lora', serif;
+    font-size: 20px;
+    color: var(--cream);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-decoration: none;
+  }
+  .navbar-brand span { color: var(--gold); }
+  .navbar-links { display: flex; align-items: center; gap: 4px; }
+  .navbar-links a {
+    font-size: 13px; font-weight: 700;
+    color: rgba(255,249,240,0.72);
+    text-decoration: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    transition: background 0.2s, color 0.2s;
+  }
+  .navbar-links a:hover { background: rgba(255,255,255,0.1); color: var(--cream); }
+  .navbar-right { display: flex; align-items: center; gap: 12px; }
+  .navbar-user { font-size: 13px; color: rgba(255,249,240,0.72); }
+  .navbar-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: var(--terracotta);
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-weight: 800; font-size: 12px;
+  }
+  .trainee-badge {
+    background: var(--terracotta);
+    color: white; font-size: 10px; font-weight: 800;
+    padding: 3px 8px; border-radius: 20px; letter-spacing: 0.5px;
+  }
+
+  /* ── PAGE HEADER ── */
+  .page-header {
+    background: var(--cream);
+    border-bottom: 1px solid var(--border);
+    padding: 20px 32px;
+  }
+  .breadcrumb {
+    font-size: 12px; color: var(--text-muted);
+    margin-bottom: 6px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .breadcrumb a { color: var(--terracotta); text-decoration: none; font-weight: 700; }
+  .breadcrumb a:hover { text-decoration: underline; }
+  .page-title {
+    font-family: 'Lora', serif;
+    font-size: 22px; font-weight: 600;
+    color: var(--warm-brown);
+  }
+
+  /* ── MAIN ── */
+  .main {
+    max-width: 760px;
+    margin: 32px auto;
+    padding: 0 24px 60px;
+    display: flex; flex-direction: column; gap: 20px;
+  }
+
+  /* ── ALREADY SIGNED BANNER ── */
+  .already-banner {
+    background: rgba(122,158,126,0.1);
+    border: 1.5px solid var(--sage-light);
+    border-radius: 12px;
+    padding: 14px 20px;
+    font-size: 13px;
+    color: var(--sage);
+    font-weight: 700;
+    display: flex; align-items: center; gap: 10px;
+    animation: fadeUp 0.3s ease both;
+  }
+
+  /* ── CARD ── */
+  .card {
+    background: var(--white);
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    animation: fadeUp 0.4s ease both;
+  }
+  .card:nth-child(2) { animation-delay: 0.05s; }
+  .card:nth-child(3) { animation-delay: 0.1s; }
+
+  .card-header {
+    padding: 18px 24px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .card-icon {
+    width: 36px; height: 36px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+  }
+  .card-icon.terra { background: rgba(196,113,74,0.12); }
+  .card-icon.sage  { background: rgba(122,158,126,0.12); }
+  .card-title {
+    font-family: 'Lora', serif;
+    font-size: 16px; font-weight: 600; color: var(--warm-brown);
+  }
+  .card-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+  .card-body { padding: 20px 24px; }
+
+  /* ── DESCRIPTION ── */
+  .doc-description {
+    font-size: 13px; color: var(--text-muted);
+    line-height: 1.65; margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* ── DOCUMENT CONTENT ── */
+  .doc-content {
+    background: var(--sand);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    max-height: 320px;
+    overflow-y: auto;
+    font-size: 13px; line-height: 1.75;
+    color: var(--text-muted);
+  }
+  .doc-content::-webkit-scrollbar { width: 4px; }
+  .doc-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  .doc-content img { max-width: 100%; border-radius: 8px; }
+  .doc-content a { color: var(--terracotta); font-weight: 700; }
+  .doc-content a:hover { text-decoration: underline; }
+  .scroll-hint {
+    font-size: 11px; color: var(--terra-light); font-weight: 700;
+    margin-top: 8px; display: flex; align-items: center; gap: 5px;
+  }
+
+  /* ── SIGNATURE SECTION ── */
+  .sig-intro {
+    font-size: 13px; color: var(--text-muted);
+    line-height: 1.65; margin-bottom: 20px;
+  }
+  .sig-intro strong { color: var(--warm-brown); }
+
+  .form-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+  label {
+    font-size: 12px; font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .required { color: var(--terracotta); margin-left: 2px; }
+  input[type="text"] {
+    padding: 12px 16px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 15px; color: var(--text);
+    background: var(--cream);
+    transition: border-color 0.2s, box-shadow 0.2s;
+    outline: none; width: 100%;
+  }
+  input[type="text"]:focus {
+    border-color: var(--terracotta);
+    box-shadow: 0 0 0 3px rgba(196,113,74,0.15);
+    background: var(--white);
+  }
+  input[type="text"]::placeholder { color: #C5B5AC; }
+
+  /* Meta info */
+  .sig-meta {
+    display: flex; gap: 20px; flex-wrap: wrap;
+    padding: 12px 16px;
+    background: var(--sand);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 20px;
+  }
+  .sig-meta-item { font-size: 12px; color: var(--text-muted); }
+  .sig-meta-item span { color: var(--warm-brown); font-weight: 700; }
+
+  /* Buttons */
+  .btn-row {
+    display: flex; gap: 12px; align-items: center;
+    padding-top: 4px;
+  }
+  .btn-submit {
+    font-family: 'Nunito', sans-serif;
+    font-size: 14px; font-weight: 800;
+    padding: 12px 28px; border-radius: 8px;
+    background: var(--terracotta); border: none;
+    color: white; cursor: pointer;
+    display: flex; align-items: center; gap: 8px;
+    transition: all 0.2s;
+    box-shadow: 0 2px 8px rgba(196,113,74,0.3);
+  }
+  .btn-submit:hover {
+    background: var(--warm-brown);
+    box-shadow: 0 4px 16px rgba(92,61,46,0.3);
+    transform: translateY(-1px);
+  }
+  .btn-cancel {
+    font-family: 'Nunito', sans-serif;
+    font-size: 14px; font-weight: 700;
+    padding: 12px 22px; border-radius: 8px;
+    background: none;
+    border: 1.5px solid var(--border);
+    color: var(--text-muted); cursor: pointer;
+    text-decoration: none;
+    transition: all 0.2s;
+  }
+  .btn-cancel:hover { border-color: var(--warm-brown); color: var(--warm-brown); }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+  <a class="navbar-brand" href="/onboarding">Imho<span>tep</span></a>
+  <div class="navbar-links">
+    <a href="/training">My Training</a>
+    <a href="/onboarding">My Onboarding</a>
+  </div>
+  <div class="navbar-right">
+    <span class="navbar-user">{{ full_name.split()[0] if full_name else 'Trainee' }}</span>
+    <div class="navbar-avatar">{{ full_name[0]|upper if full_name else 'T' }}</div>
+    <span class="trainee-badge">TRAINEE</span>
+    <a href="/trainee-logout" style="font-size:12px;padding:5px 10px;color:rgba(255,249,240,0.55);text-decoration:none;border-radius:6px;" onmouseover="this.style.background='rgba(255,80,50,0.15)'" onmouseout="this.style.background='none'">Logout</a>
+  </div>
+</nav>
+
+<!-- PAGE HEADER -->
+<div class="page-header">
+  <div class="breadcrumb">
+    <a href="/onboarding">← My Onboarding</a>
+    <span>/</span>
+    <span>{{ form['title'] }}</span>
+  </div>
+  <div class="page-title">{{ form['title'] }}</div>
+</div>
+
+<div class="main">
+
+  <!-- Already signed banner -->
+  {% if existing_sig %}
+  <div class="already-banner">
+    ✓ You already signed this on {{ existing_sig['signed_date']|string|truncate(10, True, '') }}. You can re-sign below to update.
+  </div>
+  {% endif %}
+
+  <!-- DOCUMENT CARD -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon terra">📄</div>
+      <div>
+        <div class="card-title">Document to Review</div>
+        <div class="card-subtitle">Read carefully before signing</div>
+      </div>
+    </div>
+    <div class="card-body">
+
+      {% if form['description'] %}
+      <div class="doc-description">{{ form['description'] }}</div>
+      {% endif %}
+
+      <!-- Document content -->
+      {% if form['file_filename'] %}
+        {% set ext = form['file_filename'].lower() %}
+        {% if ext.endswith('.pdf') %}
+        <div class="doc-content">
+          <p>📄 <a href="/onboarding-file-trainee/{{ form['file_filename'] }}" target="_blank">Click here to open and read the document (PDF) ↗</a></p>
+        </div>
+        {% elif ext.endswith('.png') or ext.endswith('.jpg') or ext.endswith('.jpeg') %}
+        <div class="doc-content">
+          <img src="/onboarding-file-trainee/{{ form['file_filename'] }}" alt="{{ form['title'] }}">
+        </div>
+        {% else %}
+        <div class="doc-content">
+          <p>📎 <a href="/onboarding-file-trainee/{{ form['file_filename'] }}" target="_blank">Download and read the document ↗</a></p>
+        </div>
+        {% endif %}
+      {% elif form['content'] %}
+      <div class="doc-content">{{ form['content']|safe }}</div>
+      <div class="scroll-hint">↕ Scroll to read full document</div>
+      {% else %}
+      <div class="doc-content">
+        <p style="color:var(--text-muted);font-style:italic;">No document content provided.</p>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+
+  <!-- SIGNATURE CARD -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon sage">✍️</div>
+      <div>
+        <div class="card-title">Electronic Signature</div>
+        <div class="card-subtitle">Sign to confirm you have read this document</div>
+      </div>
+    </div>
+    <div class="card-body">
+
+      <p class="sig-intro">
+        By typing your full legal name and clicking <strong>"I Agree & Sign"</strong>, you confirm you have read this document and agree to its terms. This is a legally binding electronic signature. Your name, date, and IP address will be recorded.
+      </p>
+
+      <!-- Captured metadata -->
+      <div class="sig-meta">
+        <div class="sig-meta-item">Document: <span>{{ form['title'] }}</span></div>
+        <div class="sig-meta-item">Date: <span id="sigDate"></span></div>
+        <div class="sig-meta-item">IP recorded at submission</div>
+      </div>
+
+      <form method="POST">
+        <div class="form-group">
+          <label>Full Legal Name <span class="required">*</span></label>
+          <input type="text"
+                 name="signed_name"
+                 required
+                 placeholder="Type your full legal name"
+                 value="{{ full_name }}"
+                 autocomplete="name">
+        </div>
+        <div class="btn-row">
+          <button type="submit" class="btn-submit">✓ I Agree & Sign</button>
+          <a href="/onboarding" class="btn-cancel">Cancel</a>
+        </div>
+      </form>
+
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<script>
+  document.getElementById('sigDate').textContent = new Date().toLocaleDateString('en-US', {
+    month: 'long', day: 'numeric', year: 'numeric'
+  });
+</script>
+
+</body>
+</html>
