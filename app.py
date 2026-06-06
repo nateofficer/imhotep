@@ -1720,21 +1720,6 @@ def sign_onboarding_form(form_id):
 
     conn.close()
     full_name = f'{trainee["first_name"]} {trainee["last_name"]}' if trainee else ''
-    already_signed = f'<div class="success">You already signed this on {str(existing_sig["signed_date"])[:10]}. You can re-sign below to update.</div>' if existing_sig else ''
-
-    if form['file_filename']:
-        ext = form['file_filename'].lower()
-        if ext.endswith('.pdf'):
-            content_html = f'<div class="doc-box"><p>📄 <a href="/onboarding-file-trainee/{form["file_filename"]}" target="_blank" style="color:#3498db;">Click here to open and read the document (PDF)</a></p></div>'
-        elif any(ext.endswith(e) for e in ['.png', '.jpg', '.jpeg']):
-            content_html = f'<div class="doc-box"><img src="/onboarding-file-trainee/{form["file_filename"]}" style="max-width:100%;"></div>'
-        else:
-            content_html = f'<div class="doc-box"><p>📎 <a href="/onboarding-file-trainee/{form["file_filename"]}" target="_blank" style="color:#3498db;">Download and read the document</a></p></div>'
-    elif form['content']:
-        content_html = f'<div class="doc-box">{form["content"]}</div>'
-    else:
-        content_html = '<div class="doc-box"><p>No document content provided.</p></div>'
-
     return render_template('sign_onboarding_form.html', form=form, full_name=full_name, existing_sig=existing_sig)
 
 @app.route('/onboarding-file-trainee/<filename>')
