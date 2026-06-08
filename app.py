@@ -2038,7 +2038,7 @@ if __name__ == '__main__':
 
 @app.route('/admin/documents')
 def admin_documents():
-    if not session.get('logged_in') or session.get('role') != 'admin':
+    if not session.get('logged_in'):
         return redirect('/login')
     conn = get_db()
     cur = conn.cursor()
@@ -2049,7 +2049,7 @@ def admin_documents():
 
 @app.route('/admin/documents/add', methods=['GET', 'POST'])
 def admin_add_document():
-    if not session.get('logged_in') or session.get('role') != 'admin':
+    if not session.get('logged_in'):
         return redirect('/login')
     if request.method == 'POST':
         title = request.form.get('title', '').strip()
@@ -2069,7 +2069,7 @@ def admin_add_document():
 
 @app.route('/admin/documents/edit/<int:doc_id>', methods=['GET', 'POST'])
 def admin_edit_document(doc_id):
-    if not session.get('logged_in') or session.get('role') != 'admin':
+    if not session.get('logged_in'):
         return redirect('/login')
     conn = get_db()
     cur = conn.cursor()
@@ -2092,7 +2092,7 @@ def admin_edit_document(doc_id):
 
 @app.route('/admin/documents/assign/<int:trainee_id>', methods=['GET', 'POST'])
 def admin_assign_documents(trainee_id):
-    if not session.get('logged_in') or session.get('role') != 'admin':
+    if not session.get('logged_in'):
         return redirect('/login')
     conn = get_db()
     cur = conn.cursor()
@@ -2123,7 +2123,7 @@ def admin_assign_documents(trainee_id):
 
 @app.route('/admin/documents/verify/<int:assignment_id>', methods=['POST'])
 def admin_verify_document(assignment_id):
-    if not session.get('logged_in') or session.get('role') != 'admin':
+    if not session.get('logged_in'):
         return redirect('/login')
     conn = get_db()
     cur = conn.cursor()
