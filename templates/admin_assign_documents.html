@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="max-width:600px;margin:0 auto;padding:20px;">
+  <h1 style="color:#2c3e50;border-bottom:3px solid #3498db;padding-bottom:10px;">
+    Assign Documents — {{ trainee.first_name }} {{ trainee.last_name }}
+  </h1>
+  <form method="POST" style="background:white;padding:30px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);margin-top:20px;">
+    {% if documents %}
+      {% for doc in documents %}
+      <label style="display:flex;align-items:center;gap:12px;padding:14px;border:1px solid #eee;border-radius:6px;margin-bottom:10px;cursor:pointer;">
+        <input type="checkbox" name="document_ids" value="{{ doc.id }}"
+               {{ 'checked' if doc.id in assigned_ids }}
+               style="width:18px;height:18px;">
+        <div>
+          <div style="font-weight:bold;">{{ doc.title }}</div>
+          <div style="font-size:13px;color:#888;">
+            {% if doc.doc_type == 'signable' %}Trainee signs in app{% else %}Admin verified{% endif %}
+          </div>
+        </div>
+      </label>
+      {% endfor %}
+    {% else %}
+      <p style="color:#888;">No documents in library yet. <a href="/admin/documents/add">Add one first.</a></p>
+    {% endif %}
+
+    <div style="display:flex;gap:12px;margin-top:24px;">
+      <button type="submit" class="btn">Save Assignments</button>
+      <a href="/admin/trainees/{{ trainee.id }}" class="btn" style="background:#95a5a6;">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

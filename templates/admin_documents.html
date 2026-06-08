@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="max-width:900px;margin:0 auto;padding:20px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+    <h1 style="color:#2c3e50;border-bottom:3px solid #3498db;padding-bottom:10px;">Document Library</h1>
+    <a href="/admin/documents/add" class="btn">+ Add Document</a>
+  </div>
+
+  {% if documents %}
+  <table style="width:100%;border-collapse:collapse;background:white;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+    <thead>
+      <tr style="background:#3498db;color:white;">
+        <th style="padding:12px 16px;text-align:left;">Title</th>
+        <th style="padding:12px 16px;text-align:left;">Type</th>
+        <th style="padding:12px 16px;text-align:left;">Status</th>
+        <th style="padding:12px 16px;text-align:left;">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for doc in documents %}
+      <tr style="border-bottom:1px solid #eee;">
+        <td style="padding:12px 16px;">{{ doc.title }}</td>
+        <td style="padding:12px 16px;">
+          {% if doc.doc_type == 'signable' %}
+            <span style="background:#e8f5e9;color:#2e7d32;padding:3px 10px;border-radius:12px;font-size:13px;">Signable</span>
+          {% else %}
+            <span style="background:#fff3e0;color:#e65100;padding:3px 10px;border-radius:12px;font-size:13px;">Admin Verified</span>
+          {% endif %}
+        </td>
+        <td style="padding:12px 16px;">
+          {% if doc.active %}
+            <span style="color:#27ae60;">● Active</span>
+          {% else %}
+            <span style="color:#e74c3c;">● Inactive</span>
+          {% endif %}
+        </td>
+        <td style="padding:12px 16px;">
+          <a href="/admin/documents/edit/{{ doc.id }}" style="color:#3498db;margin-right:12px;">Edit</a>
+          {% if doc.drive_link %}
+          <a href="{{ doc.drive_link }}" target="_blank" style="color:#27ae60;">View Doc</a>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="text-align:center;padding:60px;background:white;border-radius:8px;color:#888;">
+    <p style="font-size:18px;">No documents yet.</p>
+    <a href="/admin/documents/add" class="btn" style="margin-top:12px;">Add Your First Document</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

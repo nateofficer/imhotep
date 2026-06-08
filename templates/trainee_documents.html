@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="max-width:800px;margin:0 auto;padding:20px;">
+  <h1 style="color:#2c3e50;border-bottom:3px solid #3498db;padding-bottom:10px;">My Documents</h1>
+
+  {% if documents %}
+    {% for doc in documents %}
+    <div style="background:white;border-radius:8px;padding:20px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.08);display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div style="font-size:18px;font-weight:bold;color:#2c3e50;">{{ doc.title }}</div>
+        {% if doc.description %}
+        <div style="color:#888;font-size:14px;margin-top:4px;">{{ doc.description }}</div>
+        {% endif %}
+        <div style="margin-top:8px;">
+          {% if doc.status == 'signed' %}
+            <span style="background:#e8f5e9;color:#2e7d32;padding:4px 12px;border-radius:12px;font-size:13px;">✅ Signed {{ doc.signed_date.strftime('%b %d, %Y') if doc.signed_date }}</span>
+          {% elif doc.status == 'verified' %}
+            <span style="background:#e3f2fd;color:#1565c0;padding:4px 12px;border-radius:12px;font-size:13px;">✅ Verified by {{ doc.verified_by }}</span>
+          {% else %}
+            <span style="background:#fff3e0;color:#e65100;padding:4px 12px;border-radius:12px;font-size:13px;">⏳ Action Required</span>
+          {% endif %}
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;">
+        {% if doc.drive_link %}
+        <a href="{{ doc.drive_link }}" target="_blank" class="btn" style="background:#27ae60;">View</a>
+        {% endif %}
+        {% if doc.doc_type == 'signable' and doc.status == 'pending' %}
+        <a href="/trainee/documents/sign/{{ doc.assignment_id }}" class="btn">Sign</a>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+  <div style="text-align:center;padding:60px;background:white;border-radius:8px;color:#888;">
+    <p>No documents assigned yet.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

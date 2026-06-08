@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="max-width:600px;margin:0 auto;padding:20px;">
+  <h1 style="color:#2c3e50;border-bottom:3px solid #3498db;padding-bottom:10px;">
+    {{ 'Edit Document' if doc else 'Add Document' }}
+  </h1>
+  <form method="POST" style="background:white;padding:30px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);margin-top:20px;">
+    <div style="margin-bottom:18px;">
+      <label style="display:block;font-weight:bold;margin-bottom:6px;">Document Title</label>
+      <input type="text" name="title" value="{{ doc.title if doc else '' }}" required
+             style="width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;box-sizing:border-box;">
+    </div>
+
+    <div style="margin-bottom:18px;">
+      <label style="display:block;font-weight:bold;margin-bottom:6px;">Document Type</label>
+      <select name="doc_type" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;">
+        <option value="signable" {{ 'selected' if doc and doc.doc_type == 'signable' }}>Signable (trainee signs in app)</option>
+        <option value="admin_verified" {{ 'selected' if doc and doc.doc_type == 'admin_verified' }}>Admin Verified (background check, ID, etc.)</option>
+      </select>
+    </div>
+
+    <div style="margin-bottom:18px;">
+      <label style="display:block;font-weight:bold;margin-bottom:6px;">Google Drive Link</label>
+      <input type="url" name="drive_link" value="{{ doc.drive_link if doc else '' }}"
+             placeholder="https://drive.google.com/..."
+             style="width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;box-sizing:border-box;">
+    </div>
+
+    <div style="margin-bottom:18px;">
+      <label style="display:block;font-weight:bold;margin-bottom:6px;">Description (optional)</label>
+      <textarea name="description" rows="3"
+                style="width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;box-sizing:border-box;">{{ doc.description if doc else '' }}</textarea>
+    </div>
+
+    {% if doc %}
+    <div style="margin-bottom:18px;">
+      <label style="display:flex;align-items:center;gap:8px;font-weight:bold;">
+        <input type="checkbox" name="active" {{ 'checked' if doc.active }}> Active
+      </label>
+    </div>
+    {% endif %}
+
+    <div style="display:flex;gap:12px;margin-top:24px;">
+      <button type="submit" class="btn">Save Document</button>
+      <a href="/admin/documents" class="btn" style="background:#95a5a6;">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

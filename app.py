@@ -362,6 +362,44 @@ def youtube_embed(url):
 
 # ============ PUBLIC ROUTES ============
 
+
+# ── DB Migration ──────────────────────────────────────────────────────────────
+def run_doc_library_migration():
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS documents (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            title VARCHAR(255) NOT NULL,
+            doc_type ENUM('signable', 'admin_verified') NOT NULL DEFAULT 'signable',
+            drive_link TEXT,
+            description TEXT,
+            active INT DEFAULT 1,
+            created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS trainee_documents (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            trainee_id INT NOT NULL,
+            document_id INT NOT NULL,
+            assigned_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            status ENUM('pending', 'signed', 'verified') DEFAULT 'pending',
+            signed_date TIMESTAMP NULL,
+            signature_data LONGTEXT,
+            verified_by VARCHAR(255),
+            verified_date TIMESTAMP NULL,
+            notes TEXT,
+            UNIQUE KEY unique_assignment (trainee_id, document_id)
+        )
+    """)
+
+    conn.commit()
+    print("✅ documents and trainee_documents tables created.")
+# ── End DB Migration ──────────────────────────────────────────────────────────
+
 @app.route('/')
 def show_jobs():
     conn = get_db()
@@ -1994,3 +2032,152 @@ def quote_request():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
+
+
+# ── Document Library Routes ───────────────────────────────────────────────────
+
+@app.route('/admin/documents')
+def admin_documents():
+    if not session.get('logged_in') or session.get('role') != 'admin':
+        return redirect('/login')
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM documents ORDER BY title")
+    docs = cur.fetchall()
+    return render_template('admin_documents.html', documents=docs)
+
+
+@app.route('/admin/documents/add', methods=['GET', 'POST'])
+def admin_add_document():
+    if not session.get('logged_in') or session.get('role') != 'admin':
+        return redirect('/login')
+    if request.method == 'POST':
+        title = request.form.get('title', '').strip()
+        doc_type = request.form.get('doc_type', 'signable')
+        drive_link = request.form.get('drive_link', '').strip()
+        description = request.form.get('description', '').strip()
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO documents (title, doc_type, drive_link, description) VALUES (%s, %s, %s, %s)",
+            (title, doc_type, drive_link, description)
+        )
+        conn.commit()
+        return redirect('/admin/documents')
+    return render_template('admin_document_form.html', doc=None)
+
+
+@app.route('/admin/documents/edit/<int:doc_id>', methods=['GET', 'POST'])
+def admin_edit_document(doc_id):
+    if not session.get('logged_in') or session.get('role') != 'admin':
+        return redirect('/login')
+    conn = get_db()
+    cur = conn.cursor()
+    if request.method == 'POST':
+        title = request.form.get('title', '').strip()
+        doc_type = request.form.get('doc_type', 'signable')
+        drive_link = request.form.get('drive_link', '').strip()
+        description = request.form.get('description', '').strip()
+        active = 1 if request.form.get('active') else 0
+        cur.execute(
+            "UPDATE documents SET title=%s, doc_type=%s, drive_link=%s, description=%s, active=%s WHERE id=%s",
+            (title, doc_type, drive_link, description, active, doc_id)
+        )
+        conn.commit()
+        return redirect('/admin/documents')
+    cur.execute("SELECT * FROM documents WHERE id=%s", (doc_id,))
+    doc = cur.fetchone()
+    return render_template('admin_document_form.html', doc=doc)
+
+
+@app.route('/admin/documents/assign/<int:trainee_id>', methods=['GET', 'POST'])
+def admin_assign_documents(trainee_id):
+    if not session.get('logged_in') or session.get('role') != 'admin':
+        return redirect('/login')
+    conn = get_db()
+    cur = conn.cursor()
+    if request.method == 'POST':
+        selected_ids = request.form.getlist('document_ids')
+        # Remove unselected assignments that are still pending
+        cur.execute(
+            "DELETE FROM trainee_documents WHERE trainee_id=%s AND status='pending' AND document_id NOT IN ({})".format(
+                ','.join(['%s'] * len(selected_ids)) if selected_ids else '0'
+            ),
+            [trainee_id] + [int(i) for i in selected_ids] if selected_ids else [trainee_id]
+        )
+        for doc_id in selected_ids:
+            cur.execute(
+                "INSERT IGNORE INTO trainee_documents (trainee_id, document_id) VALUES (%s, %s)",
+                (trainee_id, int(doc_id))
+            )
+        conn.commit()
+        return redirect(f'/admin/trainees/{trainee_id}')
+    cur.execute("SELECT * FROM trainees WHERE id=%s", (trainee_id,))
+    trainee = cur.fetchone()
+    cur.execute("SELECT * FROM documents WHERE active=1 ORDER BY title")
+    all_docs = cur.fetchall()
+    cur.execute("SELECT document_id FROM trainee_documents WHERE trainee_id=%s", (trainee_id,))
+    assigned_ids = {row['document_id'] for row in cur.fetchall()}
+    return render_template('admin_assign_documents.html', trainee=trainee, documents=all_docs, assigned_ids=assigned_ids)
+
+
+@app.route('/admin/documents/verify/<int:assignment_id>', methods=['POST'])
+def admin_verify_document(assignment_id):
+    if not session.get('logged_in') or session.get('role') != 'admin':
+        return redirect('/login')
+    conn = get_db()
+    cur = conn.cursor()
+    verified_by = session.get('username', 'Admin')
+    cur.execute(
+        "UPDATE trainee_documents SET status='verified', verified_by=%s, verified_date=NOW() WHERE id=%s",
+        (verified_by, assignment_id)
+    )
+    conn.commit()
+    cur.execute("SELECT trainee_id FROM trainee_documents WHERE id=%s", (assignment_id,))
+    row = cur.fetchone()
+    return redirect(f"/admin/trainees/{row['trainee_id']}")
+
+
+@app.route('/trainee/documents')
+def trainee_documents():
+    if not session.get('logged_in'):
+        return redirect('/login')
+    trainee_id = session.get('trainee_id')
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT td.id as assignment_id, d.title, d.doc_type, d.drive_link, d.description,
+               td.status, td.signed_date, td.verified_date, td.verified_by
+        FROM trainee_documents td
+        JOIN documents d ON td.document_id = d.id
+        WHERE td.trainee_id = %s
+        ORDER BY d.title
+    """, (trainee_id,))
+    docs = cur.fetchall()
+    return render_template('trainee_documents.html', documents=docs)
+
+
+@app.route('/trainee/documents/sign/<int:assignment_id>', methods=['GET', 'POST'])
+def trainee_sign_document(assignment_id):
+    if not session.get('logged_in'):
+        return redirect('/login')
+    conn = get_db()
+    cur = conn.cursor()
+    if request.method == 'POST':
+        signature_data = request.form.get('signature_data', '')
+        cur.execute(
+            "UPDATE trainee_documents SET status='signed', signature_data=%s, signed_date=NOW() WHERE id=%s",
+            (signature_data, assignment_id)
+        )
+        conn.commit()
+        return redirect('/trainee/documents')
+    cur.execute("""
+        SELECT td.*, d.title, d.drive_link, d.description
+        FROM trainee_documents td
+        JOIN documents d ON td.document_id = d.id
+        WHERE td.id=%s
+    """, (assignment_id,))
+    assignment = cur.fetchone()
+    return render_template('trainee_sign_document.html', assignment=assignment)
+
+# ── End Document Library Routes ───────────────────────────────────────────────

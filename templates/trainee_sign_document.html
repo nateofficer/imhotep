@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="max-width:700px;margin:0 auto;padding:20px;">
+  <h1 style="color:#2c3e50;border-bottom:3px solid #3498db;padding-bottom:10px;">Sign: {{ assignment.title }}</h1>
+
+  {% if assignment.drive_link %}
+  <div style="margin-bottom:24px;">
+    <a href="{{ assignment.drive_link }}" target="_blank" class="btn" style="background:#27ae60;">
+      📄 View Document Before Signing
+    </a>
+  </div>
+  {% endif %}
+
+  {% if assignment.description %}
+  <p style="color:#555;margin-bottom:20px;">{{ assignment.description }}</p>
+  {% endif %}
+
+  <div style="background:white;padding:30px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+    <p style="font-weight:bold;margin-bottom:12px;">Sign below to confirm you have read and agree to this document:</p>
+    <canvas id="signatureCanvas" width="600" height="200"
+            style="border:2px solid #ddd;border-radius:4px;cursor:crosshair;touch-action:none;width:100%;"></canvas>
+    <div style="margin-top:10px;display:flex;gap:10px;">
+      <button onclick="clearSig()" class="btn" style="background:#95a5a6;">Clear</button>
+    </div>
+
+    <form method="POST" style="margin-top:20px;">
+      <input type="hidden" name="signature_data" id="signatureData">
+      <button type="submit" onclick="return captureSignature()" class="btn" style="width:100%;padding:14px;font-size:16px;">
+        Submit Signature
+      </button>
+    </form>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('signatureCanvas');
+const ctx = canvas.getContext('2d');
+let drawing = false;
+
+function getPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  if (e.touches) {
+    return { x: (e.touches[0].clientX - rect.left) * scaleX, y: (e.touches[0].clientY - rect.top) * scaleY };
+  }
+  return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
+}
+
+canvas.addEventListener('mousedown', e => { drawing = true; ctx.beginPath(); const p = getPos(e); ctx.moveTo(p.x, p.y); });
+canvas.addEventListener('mousemove', e => { if (!drawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.strokeStyle = '#2c3e50'; ctx.lineWidth = 2; ctx.stroke(); });
+canvas.addEventListener('mouseup', () => drawing = false);
+canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing = true; ctx.beginPath(); const p = getPos(e); ctx.moveTo(p.x, p.y); });
+canvas.addEventListener('touchmove', e => { e.preventDefault(); if (!drawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.strokeStyle = '#2c3e50'; ctx.lineWidth = 2; ctx.stroke(); });
+canvas.addEventListener('touchend', () => drawing = false);
+
+function clearSig() { ctx.clearRect(0, 0, canvas.width, canvas.height); }
+function captureSignature() {
+  document.getElementById('signatureData').value = canvas.toDataURL();
+  return true;
+}
+</script>
+{% endblock %}
