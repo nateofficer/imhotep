@@ -1,35 +1,133 @@
-{% extends "base.html" %}
-{% block content %}
-<div style="max-width:700px;margin:0 auto;padding:20px;">
-  <h1 style="color:#2c3e50;border-bottom:3px solid #3498db;padding-bottom:10px;">Sign: {{ assignment.title }}</h1>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign Document — Imhotep</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --sand: #FAF7F2; --cream: #FFF9F0; --warm-brown: #5C3D2E;
+    --terracotta: #C4714A; --terra-light: #E8957A; --sage: #7A9E7E;
+    --sage-light: #B5CEB8; --gold: #D4A843; --text: #2E1F16;
+    --text-muted: #7A6358; --border: #E8DDD5; --white: #FFFFFF;
+    --shadow: 0 2px 12px rgba(92,61,46,0.08);
+    --shadow-md: 0 4px 24px rgba(92,61,46,0.12);
+  }
+  body { font-family: 'Nunito', sans-serif; background: var(--sand); color: var(--text); }
+  nav {
+    background: var(--warm-brown); padding: 0 32px; height: 56px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .navbar-brand {
+    font-family: 'Lora', serif; font-size: 20px; color: var(--cream);
+    font-weight: 600; letter-spacing: 0.5px; text-decoration: none;
+  }
+  .navbar-brand span { color: var(--gold); }
+  .navbar-links { display: flex; align-items: center; gap: 4px; }
+  .navbar-links a {
+    font-size: 13px; font-weight: 700; color: rgba(255,249,240,0.72);
+    text-decoration: none; padding: 6px 12px; border-radius: 6px;
+    transition: background 0.2s, color 0.2s;
+  }
+  .navbar-links a:hover { background: rgba(255,255,255,0.1); color: var(--cream); }
+  .main { max-width: 860px; margin: 32px auto; padding: 0 24px 60px; }
+  .page-title {
+    font-family: 'Lora', serif; font-size: 24px; font-weight: 600;
+    color: var(--warm-brown); border-bottom: 2px solid var(--border);
+    padding-bottom: 12px; margin-bottom: 24px;
+  }
+  .card {
+    background: var(--white); border-radius: 14px; border: 1px solid var(--border);
+    box-shadow: var(--shadow); overflow: hidden; margin-bottom: 16px;
+  }
+  .btn {
+    font-family: 'Nunito', sans-serif; font-size: 14px; font-weight: 800;
+    padding: 10px 24px; border-radius: 8px; background: var(--terracotta);
+    border: none; color: white; cursor: pointer; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s;
+  }
+  .btn:hover { background: var(--warm-brown); }
+  .btn-sage { background: var(--sage); }
+  .btn-sage:hover { background: #5a7e5e; }
+  .btn-muted { background: #95a5a6; }
+  .btn-muted:hover { background: #7f8c8d; }
+  label { font-weight: 700; font-size: 14px; color: var(--text); }
+  input[type=text], input[type=url], textarea, select {
+    width: 100%; padding: 10px 14px; border: 1.5px solid var(--border);
+    border-radius: 8px; font-family: 'Nunito', sans-serif; font-size: 14px;
+    color: var(--text); background: var(--cream); margin-top: 6px;
+    transition: border 0.2s;
+  }
+  input:focus, textarea:focus, select:focus {
+    outline: none; border-color: var(--terracotta);
+  }
+  .form-group { margin-bottom: 18px; }
+  .badge {
+    display: inline-block; padding: 3px 12px; border-radius: 12px;
+    font-size: 12px; font-weight: 700;
+  }
+  .badge-green { background: #e8f5e9; color: #2e7d32; }
+  .badge-orange { background: #fff3e0; color: #e65100; }
+  .badge-blue { background: #e3f2fd; color: #1565c0; }
+  .badge-red { background: #fce4ec; color: #c62828; }
+  table { width: 100%; border-collapse: collapse; }
+  th { background: var(--warm-brown); color: var(--cream); padding: 12px 16px; text-align: left; font-size: 13px; }
+  td { padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 14px; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--sand); }
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+  .empty-state p { font-size: 16px; margin-bottom: 16px; }
+</style>
+</head>
+<body>
+<nav>
+  <a href="/" class="navbar-brand">Casey's<span>Cleaning</span></a>
+  <div class="navbar-links">
+    <a href="/onboarding">Onboarding</a>
+    <a href="/trainee/documents">My Documents</a>
+    <a href="/trainee-logout">Logout</a>
+  </div>
+</nav>
+<div class="main">
 
-  {% if assignment.drive_link %}
-  <div style="margin-bottom:24px;">
-    <a href="{{ assignment.drive_link }}" target="_blank" class="btn" style="background:#27ae60;">
-      📄 View Document Before Signing
+<h1 class="page-title">Sign: {{ assignment.title }}</h1>
+
+{% if assignment.drive_link %}
+<div class="card" style="padding:20px;margin-bottom:20px;display:flex;align-items:center;gap:16px;">
+  <span style="font-size:24px;">&#128196;</span>
+  <div>
+    <div style="font-weight:700;margin-bottom:4px;">Review this document before signing</div>
+    <a href="{{ assignment.drive_link }}" target="_blank" class="btn btn-sage" style="font-size:13px;">
+      Open Document
     </a>
   </div>
-  {% endif %}
+</div>
+{% endif %}
 
-  {% if assignment.description %}
-  <p style="color:#555;margin-bottom:20px;">{{ assignment.description }}</p>
-  {% endif %}
+<div class="card" style="padding:30px;">
+  <p style="font-weight:700;margin-bottom:16px;color:var(--warm-brown);">
+    Sign below to confirm you have read and agree to this document:
+  </p>
 
-  <div style="background:white;padding:30px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
-    <p style="font-weight:bold;margin-bottom:12px;">Sign below to confirm you have read and agree to this document:</p>
-    <canvas id="signatureCanvas" width="600" height="200"
-            style="border:2px solid #ddd;border-radius:4px;cursor:crosshair;touch-action:none;width:100%;"></canvas>
-    <div style="margin-top:10px;display:flex;gap:10px;">
-      <button onclick="clearSig()" class="btn" style="background:#95a5a6;">Clear</button>
-    </div>
+  <canvas id="signatureCanvas" width="700" height="200"
+          style="border:2px solid var(--border);border-radius:8px;
+                 cursor:crosshair;touch-action:none;width:100%;
+                 background:white;"></canvas>
 
-    <form method="POST" style="margin-top:20px;">
-      <input type="hidden" name="signature_data" id="signatureData">
-      <button type="submit" onclick="return captureSignature()" class="btn" style="width:100%;padding:14px;font-size:16px;">
-        Submit Signature
-      </button>
-    </form>
+  <div style="margin-top:12px;">
+    <button onclick="clearSig()" class="btn btn-muted" style="font-size:13px;">Clear</button>
   </div>
+
+  <form method="POST" style="margin-top:24px;">
+    <input type="hidden" name="signature_data" id="signatureData">
+    <button type="submit" onclick="return captureSignature()" class="btn"
+            style="width:100%;padding:14px;font-size:16px;justify-content:center;">
+      Submit Signature
+    </button>
+  </form>
 </div>
 
 <script>
@@ -48,10 +146,11 @@ function getPos(e) {
 }
 
 canvas.addEventListener('mousedown', e => { drawing = true; ctx.beginPath(); const p = getPos(e); ctx.moveTo(p.x, p.y); });
-canvas.addEventListener('mousemove', e => { if (!drawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.strokeStyle = '#2c3e50'; ctx.lineWidth = 2; ctx.stroke(); });
+canvas.addEventListener('mousemove', e => { if (!drawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.strokeStyle = '#5C3D2E'; ctx.lineWidth = 2; ctx.stroke(); });
 canvas.addEventListener('mouseup', () => drawing = false);
+canvas.addEventListener('mouseleave', () => drawing = false);
 canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing = true; ctx.beginPath(); const p = getPos(e); ctx.moveTo(p.x, p.y); });
-canvas.addEventListener('touchmove', e => { e.preventDefault(); if (!drawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.strokeStyle = '#2c3e50'; ctx.lineWidth = 2; ctx.stroke(); });
+canvas.addEventListener('touchmove', e => { e.preventDefault(); if (!drawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.strokeStyle = '#5C3D2E'; ctx.lineWidth = 2; ctx.stroke(); });
 canvas.addEventListener('touchend', () => drawing = false);
 
 function clearSig() { ctx.clearRect(0, 0, canvas.width, canvas.height); }
@@ -60,4 +159,7 @@ function captureSignature() {
   return true;
 }
 </script>
-{% endblock %}
+
+</div>
+</body>
+</html>

@@ -1,49 +1,149 @@
-{% extends "base.html" %}
-{% block content %}
-<div style="max-width:600px;margin:0 auto;padding:20px;">
-  <h1 style="color:#2c3e50;border-bottom:3px solid #3498db;padding-bottom:10px;">
-    {{ 'Edit Document' if doc else 'Add Document' }}
-  </h1>
-  <form method="POST" style="background:white;padding:30px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);margin-top:20px;">
-    <div style="margin-bottom:18px;">
-      <label style="display:block;font-weight:bold;margin-bottom:6px;">Document Title</label>
-      <input type="text" name="title" value="{{ doc.title if doc else '' }}" required
-             style="width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;box-sizing:border-box;">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ 'Edit' if doc else 'Add' }} Document — Imhotep</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --sand: #FAF7F2; --cream: #FFF9F0; --warm-brown: #5C3D2E;
+    --terracotta: #C4714A; --terra-light: #E8957A; --sage: #7A9E7E;
+    --sage-light: #B5CEB8; --gold: #D4A843; --text: #2E1F16;
+    --text-muted: #7A6358; --border: #E8DDD5; --white: #FFFFFF;
+    --shadow: 0 2px 12px rgba(92,61,46,0.08);
+    --shadow-md: 0 4px 24px rgba(92,61,46,0.12);
+  }
+  body { font-family: 'Nunito', sans-serif; background: var(--sand); color: var(--text); }
+  nav {
+    background: var(--warm-brown); padding: 0 32px; height: 56px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .navbar-brand {
+    font-family: 'Lora', serif; font-size: 20px; color: var(--cream);
+    font-weight: 600; letter-spacing: 0.5px; text-decoration: none;
+  }
+  .navbar-brand span { color: var(--gold); }
+  .navbar-links { display: flex; align-items: center; gap: 4px; }
+  .navbar-links a {
+    font-size: 13px; font-weight: 700; color: rgba(255,249,240,0.72);
+    text-decoration: none; padding: 6px 12px; border-radius: 6px;
+    transition: background 0.2s, color 0.2s;
+  }
+  .navbar-links a:hover { background: rgba(255,255,255,0.1); color: var(--cream); }
+  .main { max-width: 860px; margin: 32px auto; padding: 0 24px 60px; }
+  .page-title {
+    font-family: 'Lora', serif; font-size: 24px; font-weight: 600;
+    color: var(--warm-brown); border-bottom: 2px solid var(--border);
+    padding-bottom: 12px; margin-bottom: 24px;
+  }
+  .card {
+    background: var(--white); border-radius: 14px; border: 1px solid var(--border);
+    box-shadow: var(--shadow); overflow: hidden; margin-bottom: 16px;
+  }
+  .btn {
+    font-family: 'Nunito', sans-serif; font-size: 14px; font-weight: 800;
+    padding: 10px 24px; border-radius: 8px; background: var(--terracotta);
+    border: none; color: white; cursor: pointer; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s;
+  }
+  .btn:hover { background: var(--warm-brown); }
+  .btn-sage { background: var(--sage); }
+  .btn-sage:hover { background: #5a7e5e; }
+  .btn-muted { background: #95a5a6; }
+  .btn-muted:hover { background: #7f8c8d; }
+  label { font-weight: 700; font-size: 14px; color: var(--text); }
+  input[type=text], input[type=url], textarea, select {
+    width: 100%; padding: 10px 14px; border: 1.5px solid var(--border);
+    border-radius: 8px; font-family: 'Nunito', sans-serif; font-size: 14px;
+    color: var(--text); background: var(--cream); margin-top: 6px;
+    transition: border 0.2s;
+  }
+  input:focus, textarea:focus, select:focus {
+    outline: none; border-color: var(--terracotta);
+  }
+  .form-group { margin-bottom: 18px; }
+  .badge {
+    display: inline-block; padding: 3px 12px; border-radius: 12px;
+    font-size: 12px; font-weight: 700;
+  }
+  .badge-green { background: #e8f5e9; color: #2e7d32; }
+  .badge-orange { background: #fff3e0; color: #e65100; }
+  .badge-blue { background: #e3f2fd; color: #1565c0; }
+  .badge-red { background: #fce4ec; color: #c62828; }
+  table { width: 100%; border-collapse: collapse; }
+  th { background: var(--warm-brown); color: var(--cream); padding: 12px 16px; text-align: left; font-size: 13px; }
+  td { padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 14px; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--sand); }
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+  .empty-state p { font-size: 16px; margin-bottom: 16px; }
+</style>
+</head>
+<body>
+<nav>
+  <a href="/" class="navbar-brand">Casey's<span>Cleaning</span></a>
+  <div class="navbar-links">
+    <a href="/applications">Applications</a>
+    <a href="/trainees">Trainees</a>
+    <a href="/onboarding-forms">Onboarding</a>
+    <a href="/admin/documents">Documents</a>
+    <a href="/logout">Logout</a>
+  </div>
+</nav>
+<div class="main">
+
+<h1 class="page-title">{{ 'Edit Document' if doc else 'Add Document' }}</h1>
+
+<div class="card" style="padding:30px;">
+  <form method="POST">
+    <div class="form-group">
+      <label>Document Title</label>
+      <input type="text" name="title" value="{{ doc.title if doc else '' }}" required>
     </div>
 
-    <div style="margin-bottom:18px;">
-      <label style="display:block;font-weight:bold;margin-bottom:6px;">Document Type</label>
-      <select name="doc_type" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;">
-        <option value="signable" {{ 'selected' if doc and doc.doc_type == 'signable' }}>Signable (trainee signs in app)</option>
-        <option value="admin_verified" {{ 'selected' if doc and doc.doc_type == 'admin_verified' }}>Admin Verified (background check, ID, etc.)</option>
+    <div class="form-group">
+      <label>Document Type</label>
+      <select name="doc_type">
+        <option value="signable" {{ 'selected' if doc and doc.doc_type == 'signable' }}>
+          Signable — trainee reviews and signs in app
+        </option>
+        <option value="admin_verified" {{ 'selected' if doc and doc.doc_type == 'admin_verified' }}>
+          Admin Verified — background check, ID verification, etc.
+        </option>
       </select>
     </div>
 
-    <div style="margin-bottom:18px;">
-      <label style="display:block;font-weight:bold;margin-bottom:6px;">Google Drive Link</label>
+    <div class="form-group">
+      <label>Google Drive Link</label>
       <input type="url" name="drive_link" value="{{ doc.drive_link if doc else '' }}"
-             placeholder="https://drive.google.com/..."
-             style="width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;box-sizing:border-box;">
+             placeholder="https://drive.google.com/...">
     </div>
 
-    <div style="margin-bottom:18px;">
-      <label style="display:block;font-weight:bold;margin-bottom:6px;">Description (optional)</label>
-      <textarea name="description" rows="3"
-                style="width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;box-sizing:border-box;">{{ doc.description if doc else '' }}</textarea>
+    <div class="form-group">
+      <label>Description <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
+      <textarea name="description" rows="3">{{ doc.description if doc else '' }}</textarea>
     </div>
 
     {% if doc %}
-    <div style="margin-bottom:18px;">
-      <label style="display:flex;align-items:center;gap:8px;font-weight:bold;">
-        <input type="checkbox" name="active" {{ 'checked' if doc.active }}> Active
+    <div class="form-group">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+        <input type="checkbox" name="active" {{ 'checked' if doc.active }}
+               style="width:18px;height:18px;margin:0;">
+        Active (visible for assignment)
       </label>
     </div>
     {% endif %}
 
     <div style="display:flex;gap:12px;margin-top:24px;">
       <button type="submit" class="btn">Save Document</button>
-      <a href="/admin/documents" class="btn" style="background:#95a5a6;">Cancel</a>
+      <a href="/admin/documents" class="btn btn-muted">Cancel</a>
     </div>
   </form>
 </div>
-{% endblock %}
+
+</div>
+</body>
+</html>
