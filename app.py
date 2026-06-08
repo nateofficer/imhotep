@@ -1960,50 +1960,35 @@ def crm_delete(lead_id):
 @app.route('/quote', methods=['GET', 'POST'])
 def quote_request():
     if request.method == 'POST':
+        first_name    = request.form.get('first_name', '').strip()
+        last_name     = request.form.get('last_name', '').strip()
+        phone         = request.form.get('phone', '').strip()
+        email         = request.form.get('email', '').strip()
+        address       = request.form.get('address', '').strip()
+        notes         = request.form.get('notes', '').strip()
+        cleaning_type = request.form.get('cleaning_type', 'standard')
+        bedrooms      = request.form.get('bedrooms', '3')
+        bathrooms     = request.form.get('bathrooms', '2')
+        estimate      = request.form.get('estimate', '0')
+
+        full_notes = f"[Quote] Type: {cleaning_type.upper()} | Beds: {bedrooms} | Baths: {bathrooms} | Estimate: ${estimate}"
+        if notes:
+            full_notes += f" | Notes: {notes}"
+        if address:
+            full_notes += f" | Address: {address}"
+
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''INSERT INTO leads
-                          (first_name, last_name, phone, email, address, service_type, status, notes)
-                          VALUES (%s, %s, %s, %s, %s, %s, 'new', %s)''',
-                       (request.form['first_name'], request.form['last_name'],
-                        request.form.get('phone', ''), request.form.get('email', ''),
-                        request.form.get('address', ''), request.form.get('service_type', ''),
-                        request.form.get('notes', '')))
+            (first_name, last_name, phone, email, address, service_type, status, notes)
+            VALUES (%s, %s, %s, %s, %s, %s, 'new', %s)''',
+            (first_name, last_name, phone, email, address, cleaning_type, full_notes))
         conn.commit()
         conn.close()
-        return STYLE + public_nav() + '''
-        <h1>Thank You!</h1>
-        <div class="success">
-            <p>We received your request! Casey\'s Cleaning Company will contact you within 24 hours with a quote.</p>
-        </div>
-        <a class="btn" href="/">Back to Home</a>
-        '''
 
-    service_options = ''.join(f'<option value="{s}">{s}</option>' for s in SERVICE_TYPES)
-    return STYLE + public_nav() + f'''
-    <h1>Request a Free Quote</h1>
-    <p class="form-note">Fill out the form below and we\'ll get back to you within 24 hours.</p>
-    <form method="POST">
-        <label>First Name:</label>
-        <input type="text" name="first_name" required>
-        <label>Last Name:</label>
-        <input type="text" name="last_name" required>
-        <label>Phone:</label>
-        <input type="tel" name="phone" required>
-        <label>Email:</label>
-        <input type="email" name="email">
-        <label>Service Address:</label>
-        <input type="text" name="address" required placeholder="Street address, Las Vegas NV">
-        <label>Type of Cleaning:</label>
-        <select name="service_type" required>
-            <option value="">-- Select --</option>
-            {service_options}
-        </select>
-        <label>Anything else we should know? (optional)</label>
-        <textarea name="notes" rows="3" placeholder="Number of bedrooms, pets, special requests..."></textarea>
-        <button class="btn btn-success" type="submit">Request Quote</button>
-    </form>
-    '''
+        return render_template('quote_thanks.html', name=first_name, estimate=estimate)
+
+    return render_template('quote.html')
 
 
 if __name__ == '__main__':

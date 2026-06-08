@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quote Received – Casey's Cleaning Company</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --sand: #FAF7F2; --cream: #FFF9F0; --warm-brown: #5C3D2E;
+    --terracotta: #C4714A; --sage: #7A9E7E; --gold: #D4A843;
+    --text: #2E1F16; --muted: #7A6358; --border: #E8DDD5;
+  }
+  body { font-family: 'Nunito', sans-serif; background: var(--sand); color: var(--text); min-height: 100vh; }
+  .navbar {
+    background: var(--warm-brown); padding: 0 32px; height: 56px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .navbar-brand { font-family: 'Lora', serif; font-size: 20px; color: var(--cream); font-weight: 600; text-decoration: none; }
+  .navbar-brand span { color: var(--gold); }
+  .center {
+    max-width: 520px; margin: 80px auto; padding: 0 24px;
+    text-align: center;
+  }
+  .success-card {
+    background: white; border-radius: 16px;
+    border: 1px solid var(--border);
+    box-shadow: 0 4px 24px rgba(92,61,46,0.1);
+    padding: 48px 40px;
+    animation: fadeUp 0.4s ease both;
+  }
+  .check { font-size: 56px; margin-bottom: 16px; }
+  h1 { font-family: 'Lora', serif; font-size: 24px; color: var(--warm-brown); margin-bottom: 10px; }
+  p { font-size: 14px; color: var(--muted); line-height: 1.7; margin-bottom: 12px; }
+  .estimate-highlight {
+    background: rgba(196,113,74,0.1);
+    border: 1.5px solid rgba(196,113,74,0.25);
+    border-radius: 10px;
+    padding: 14px 20px;
+    margin: 20px 0;
+    font-size: 15px; font-weight: 700; color: var(--warm-brown);
+  }
+  .btn {
+    display: inline-block;
+    font-family: 'Nunito', sans-serif; font-weight: 800;
+    font-size: 14px; padding: 11px 24px;
+    border-radius: 8px; background: var(--terracotta);
+    color: white; text-decoration: none;
+    transition: background 0.2s;
+    margin-top: 8px;
+  }
+  .btn:hover { background: var(--warm-brown); }
+  @keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+</style>
+</head>
+<body>
+<nav class="navbar">
+  <a class="navbar-brand" href="/">Casey's <span>Cleaning</span></a>
+</nav>
+<div class="center">
+  <div class="success-card">
+    <div class="check">✅</div>
+    <h1>Quote Request Received!</h1>
+    <p>Thank you, {{ name }}! We've received your request and will call or text you within 24 hours to confirm your appointment.</p>
+    {% if estimate %}
+    <div class="estimate-highlight">
+      Your estimated price: <strong>${{ estimate }}</strong>
+    </div>
+    {% endif %}
+    <p>Final pricing will be confirmed after our on-site walkthrough. No surprises, no pressure.</p>
+    <a href="/" class="btn">Back to Home</a>
+  </div>
+</div>
+</body>
+</html>
