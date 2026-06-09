@@ -2075,10 +2075,12 @@ def admin_add_document():
         if uploaded_file and uploaded_file.filename:
             upload_result = cloudinary.uploader.upload(
                 uploaded_file,
-                resource_type='auto',
+                resource_type='raw',
                 folder='imhotep_docs',
                 use_filename=True,
-                unique_filename=True
+                unique_filename=True,
+                access_mode='public',
+                type='upload'
             )
             file_url = upload_result.get('secure_url', '')
         conn = get_db()
@@ -2109,10 +2111,12 @@ def admin_edit_document(doc_id):
         if uploaded_file and uploaded_file.filename:
             upload_result = cloudinary.uploader.upload(
                 uploaded_file,
-                resource_type='auto',
+                resource_type='raw',
                 folder='imhotep_docs',
                 use_filename=True,
-                unique_filename=True
+                unique_filename=True,
+                access_mode='public',
+                type='upload'
             )
             file_url = upload_result.get('secure_url', '')
         cur.execute(
