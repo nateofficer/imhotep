@@ -438,7 +438,8 @@ def login():
         password = request.form.get('password', '')
         if password == ADMIN_PASSWORD:
             session['logged_in'] = True
-            return redirect('/applications')
+            session.permanent = True
+            return redirect('/admin/documents')
         else:
             error = '<div class="error">Incorrect password. Try again.</div>'
 
