@@ -2075,7 +2075,7 @@ def admin_add_document():
         if uploaded_file and uploaded_file.filename:
             upload_result = cloudinary.uploader.upload(
                 uploaded_file,
-                resource_type='raw',
+                resource_type='auto',
                 folder='imhotep_docs',
                 use_filename=True,
                 unique_filename=True
@@ -2109,7 +2109,7 @@ def admin_edit_document(doc_id):
         if uploaded_file and uploaded_file.filename:
             upload_result = cloudinary.uploader.upload(
                 uploaded_file,
-                resource_type='raw',
+                resource_type='auto',
                 folder='imhotep_docs',
                 use_filename=True,
                 unique_filename=True
