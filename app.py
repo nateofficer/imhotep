@@ -15,6 +15,10 @@ app = Flask(__name__)
 
 # Secret key for sessions
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-change-me')
+app.config['SESSION_COOKIE_SECURE'] = True
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['PERMANENT_SESSION_LIFETIME'] = 86400  # 24 hours
 
 # Admin password
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'changeme')
