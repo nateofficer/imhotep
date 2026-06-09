@@ -1,4 +1,6 @@
 from flask import Flask, render_template, request, redirect, send_from_directory, session, url_for
+import cloudinary
+import cloudinary.uploader
 import pymysql
 import pymysql.cursors
 import os
@@ -19,6 +21,13 @@ app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = 86400  # 24 hours
+
+# Cloudinary config
+cloudinary.config(
+    cloud_name=os.environ.get('CLOUDINARY_CLOUD_NAME'),
+    api_key=os.environ.get('CLOUDINARY_API_KEY'),
+    api_secret=os.environ.get('CLOUDINARY_API_SECRET')
+)
 
 # Admin password
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'changeme')
@@ -2061,11 +2070,22 @@ def admin_add_document():
         doc_type = request.form.get('doc_type', 'signable')
         drive_link = request.form.get('drive_link', '').strip()
         description = request.form.get('description', '').strip()
+        file_url = ''
+        uploaded_file = request.files.get('document_file')
+        if uploaded_file and uploaded_file.filename:
+            upload_result = cloudinary.uploader.upload(
+                uploaded_file,
+                resource_type='raw',
+                folder='imhotep_docs',
+                use_filename=True,
+                unique_filename=True
+            )
+            file_url = upload_result.get('secure_url', '')
         conn = get_db()
         cur = conn.cursor()
         cur.execute(
-            "INSERT INTO documents (title, doc_type, drive_link, description) VALUES (%s, %s, %s, %s)",
-            (title, doc_type, drive_link, description)
+            "INSERT INTO documents (title, doc_type, drive_link, file_url, description) VALUES (%s, %s, %s, %s, %s)",
+            (title, doc_type, drive_link, file_url, description)
         )
         conn.commit()
         return redirect('/admin/documents')
@@ -2084,9 +2104,20 @@ def admin_edit_document(doc_id):
         drive_link = request.form.get('drive_link', '').strip()
         description = request.form.get('description', '').strip()
         active = 1 if request.form.get('active') else 0
+        uploaded_file = request.files.get('document_file')
+        file_url = request.form.get('existing_file_url', '')
+        if uploaded_file and uploaded_file.filename:
+            upload_result = cloudinary.uploader.upload(
+                uploaded_file,
+                resource_type='raw',
+                folder='imhotep_docs',
+                use_filename=True,
+                unique_filename=True
+            )
+            file_url = upload_result.get('secure_url', '')
         cur.execute(
-            "UPDATE documents SET title=%s, doc_type=%s, drive_link=%s, description=%s, active=%s WHERE id=%s",
-            (title, doc_type, drive_link, description, active, doc_id)
+            "UPDATE documents SET title=%s, doc_type=%s, drive_link=%s, file_url=%s, description=%s, active=%s WHERE id=%s",
+            (title, doc_type, drive_link, file_url, description, active, doc_id)
         )
         conn.commit()
         return redirect('/admin/documents')
