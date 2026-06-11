@@ -448,7 +448,7 @@ def login():
         if password == ADMIN_PASSWORD:
             session['logged_in'] = True
             session.permanent = True
-            return redirect('/admin/documents')
+            return redirect('/applications')
         else:
             error = '<div class="error">Incorrect password. Try again.</div>'
 
