@@ -310,6 +310,7 @@ def admin_nav():
         <a href="/training-modules">Training</a>
         <a href="/onboarding-forms">Onboarding</a>
         <a href="/trainees">Trainees</a>
+        <a href="/admin/documents">Documents</a>
         <a href="/logout">Logout</a>
         <span class="admin-badge">ADMIN</span>
     </div>
@@ -1061,6 +1062,7 @@ def trainees_list():
                 <p><strong>Hired:</strong> {t['hired_date']}</p>
                 <p><strong>Progress:</strong> {progress_txt}</p>
                 <a class="btn" href="/trainee/{t['id']}">View Details &amp; Access Code</a>
+                <a class="btn" href="/admin/documents/assign/{t['id']}">Assign Documents</a>
             </div>
             '''
     conn.close()
@@ -1106,6 +1108,7 @@ def trainee_detail(trainee_id):
         <p><strong>Hired Date:</strong> {t['hired_date']}</p>
         <h3>Trainee Access Code</h3>
         <div class="access-code-display">{t['access_code']}</div>
+        <a class="btn" href="/admin/documents/assign/{trainee_id}">Assign Documents</a>
         <p class="form-note">Send this code to {t['first_name']} along with the training login URL. They will use their email ({t['email']}) and this code to log in.</p>
     </div>
     '''
