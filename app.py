@@ -1699,7 +1699,7 @@ def trainee_onboarding_status(trainee_id):
 @app.route('/onboarding')
 @trainee_required
 def trainee_onboarding():
-    trainee_id = session.get('trainee_id')
+    return redirect(url_for(trainee_documents))
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
