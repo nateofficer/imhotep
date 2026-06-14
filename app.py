@@ -2178,7 +2178,7 @@ def admin_verify_document(assignment_id):
     conn.commit()
     cur.execute("SELECT trainee_id FROM trainee_documents WHERE id=%s", (assignment_id,))
     row = cur.fetchone()
-    return redirect(f"/admin/trainees/{row['trainee_id']}")
+        return redirect(url_for(trainees_list))
 
 
 @app.route('/trainee/documents')
