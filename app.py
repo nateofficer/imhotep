@@ -2154,7 +2154,7 @@ def admin_assign_documents(trainee_id):
                 (trainee_id, int(doc_id))
             )
         conn.commit()
-        return redirect(f'/admin/trainees/{trainee_id}')
+        return redirect(url_for(trainees_list))
     cur.execute("SELECT * FROM trainees WHERE id=%s", (trainee_id,))
     trainee = cur.fetchone()
     cur.execute("SELECT * FROM documents WHERE active=1 ORDER BY title")
