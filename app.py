@@ -307,7 +307,7 @@ nav{background:#5C3D2E;padding:0 32px;height:56px;display:flex;align-items:cente
 .navbar-brand{font-family:'Lora',serif;font-size:20px;color:#FFF9F0;font-weight:600;letter-spacing:0.5px;text-decoration:none;}
 .navbar-brand span{color:#D4A843;}
 .navbar-links{display:flex;align-items:center;gap:4px;}
-.navbar-links a{font-size:13px;font-weight:700;color:rgba(255,249,240,0.72);text-decoration:none;padding:6px 12px;border-radius:6px;}
+.navbar-links a{font-size:13px;font-weight:700;color:rgba(255,249,240,0.72);text-decoration:none;padding:6px 12px;border-radius:6px;white-space:nowrap;}
 .navbar-links a:hover{background:rgba(255,249,240,0.12);color:#FFF9F0;}
 </style>
 <nav>
