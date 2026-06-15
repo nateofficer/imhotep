@@ -1699,7 +1699,7 @@ def trainee_onboarding_status(trainee_id):
             <p>{status_html}</p>
             {f'<p class="form-note">IP recorded: {sig["ip_address"]}</p>' if sig and sig.get("ip_address") else ''}
         </div>
-        '''
+    return redirect(url_for('trainee_documents'))
     html += f'<p><a class="btn" href="/trainee/{trainee_id}">Back to Trainee Profile</a></p>'
     return html
 
