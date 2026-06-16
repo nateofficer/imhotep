@@ -2154,7 +2154,7 @@ def admin_assign_documents(trainee_id):
         # Remove unselected assignments that are still pending
         cur.execute(
             "DELETE FROM trainee_documents WHERE trainee_id=%s AND status='pending' AND document_id NOT IN ({})".format(
-                ','.join(['%s'] * len(selected_ids)) if selected_ids else '0'
+        return redirect(url_for('trainee_detail', trainee_id=trainee_id))
             ),
             [trainee_id] + [int(i) for i in selected_ids] if selected_ids else [trainee_id]
         )
@@ -2178,7 +2178,7 @@ def admin_assign_documents(trainee_id):
 def admin_verify_document(assignment_id):
     if not session.get('logged_in'):
         return redirect('/login')
-    conn = get_db()
+    return redirect(url_for('trainee_detail', trainee_id=row['trainee_id']))
     cur = conn.cursor()
     verified_by = session.get('username', 'Admin')
     cur.execute(
