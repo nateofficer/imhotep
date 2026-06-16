@@ -1697,13 +1697,12 @@ def trainee_onboarding_status(trainee_id):
         <div class="{card_class}">
             <h3>{f["title"]}</h3>
             <p>{status_html}</p>
-            {f'<p class="form-note">IP recorded: {sig["ip_address"]}</p>' if sig and sig.get("ip_address") else ''}
+            {('<p class="form-note">IP recorded: ' + sig["ip_address"] + '</p>') if sig and sig.get("ip_address") else ''}
         </div>
-    return redirect(url_for('trainee_documents'))
+        '''
     html += f'<p><a class="btn" href="/trainee/{trainee_id}">Back to Trainee Profile</a></p>'
     return html
-
-
+    
 # ---- TRAINEE: ONBOARDING PORTAL ----
 
 @app.route('/onboarding')
@@ -2153,7 +2152,7 @@ def admin_assign_documents(trainee_id):
         # Remove unselected assignments that are still pending
         cur.execute(
             "DELETE FROM trainee_documents WHERE trainee_id=%s AND status='pending' AND document_id NOT IN ({})".format(
-        return redirect(url_for('trainee_detail', trainee_id=trainee_id))
+                ','.join(['%s'] * len(selected_ids)) if selected_ids else '0'
             ),
             [trainee_id] + [int(i) for i in selected_ids] if selected_ids else [trainee_id]
         )
@@ -2163,7 +2162,7 @@ def admin_assign_documents(trainee_id):
                 (trainee_id, int(doc_id))
             )
         conn.commit()
-        return redirect(url_for('trainees_list'))
+        return redirect(url_for('trainee_detail', trainee_id=trainee_id))
     cur.execute("SELECT * FROM trainees WHERE id=%s", (trainee_id,))
     trainee = cur.fetchone()
     cur.execute("SELECT * FROM documents WHERE active=1 ORDER BY title")
