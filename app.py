@@ -1168,7 +1168,7 @@ def trainee_login():
 
         if trainee:
             session['trainee_id'] = trainee['id']
-            return redirect('/training')
+            return redirect('/trainee/documents')
         else:
             error = '<div class="error">Email or access code is incorrect. Please try again.</div>'
 
