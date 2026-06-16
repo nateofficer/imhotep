@@ -1271,7 +1271,7 @@ def view_module(module_id):
     module = cursor.fetchone()
     if not module:
         conn.close()
-        return redirect('/training')
+        return redirect('/trainee/documents')
 
     cursor.execute('SELECT * FROM quiz_questions WHERE module_id = %s', (module_id,))
     questions = cursor.fetchall()
@@ -1709,7 +1709,6 @@ def trainee_onboarding_status(trainee_id):
 @app.route('/onboarding')
 @trainee_required
 def trainee_onboarding():
-    return redirect(url_for(trainee_documents))
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
