@@ -2220,8 +2220,8 @@ def admin_verify_document(assignment_id):
 
 @app.route('/trainee/documents')
 def trainee_documents():
-    if not session.get('logged_in'):
-        return redirect('/login')
+    if not session.get('trainee_id'):
+        return redirect('/trainee-login')
     trainee_id = session.get('trainee_id')
     conn = get_db()
     cur = conn.cursor()
