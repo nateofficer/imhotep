@@ -2092,8 +2092,8 @@ if __name__ == '__main__':
 
 @app.route('/admin/documents')
 def admin_documents():
-    if not session.get('logged_in'):
-        return redirect('/login')
+    if not session.get('trainee_id'):
+        return redirect('/trainee-login')
     conn = get_db()
     cur = conn.cursor()
     cur.execute("SELECT * FROM documents ORDER BY title")
@@ -2239,8 +2239,8 @@ def trainee_documents():
 
 @app.route('/trainee/documents/sign/<int:assignment_id>', methods=['GET', 'POST'])
 def trainee_sign_document(assignment_id):
-    if not session.get('logged_in'):
-        return redirect('/login')
+    if not session.get('trainee_id'):
+        return redirect('/trainee-login')
     conn = get_db()
     cur = conn.cursor()
     if request.method == 'POST':
