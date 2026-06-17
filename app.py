@@ -548,7 +548,7 @@ def dashboard():
             <tr>
                 <td>{name}</td>
                 <td>{hired}</td>
-                <td><a class="btn btn-sm" href="/trainee/{t[\'id\']}">View</a></td>
+                <td><a class="btn btn-sm" href="/trainee/{t['id']}">View</a></td>
             </tr>'''
 
     # Build lead rows
