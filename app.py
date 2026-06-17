@@ -317,7 +317,7 @@ nav{background:#5C3D2E;padding:0 32px;height:56px;display:flex;align-items:cente
     <a href="/crm">CRM</a>
     <a href="/post-job">Post a Job</a>
     <a href="/training-modules">Training</a>
-    <a href="/onboarding-forms">Onboarding</a>
+    
     <a href="/trainees">Trainees</a>
     <a href="/admin/documents">Documents</a>
     <a href="/logout">Logout</a>
