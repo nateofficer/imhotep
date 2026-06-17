@@ -547,6 +547,12 @@ def view_applications():
                 </div>
                 <p style="margin-top:15px;">{resume_link}{license_link}</p>
                 {hire_button}
+                <form method="POST" action="/update-status/{app_row['id']}" style="display:inline-block; margin-left:10px;">
+                    <select name="status" onchange="this.form.submit()" style="padding:4px 8px; border-radius:4px; border:1px solid #ccc; font-size:13px;">
+                        {''.join(f'<option value="{s}" {"selected" if app_row.get("status")==s else ""}>{s}</option>'
+                            for s in ['Applied','Reviewing','Vetted','Hired','Onboarding','Training','Active','Scheduling'])}
+                    </select>
+                </form>
                 <form method="POST" action="/delete/{app_row['id']}" onsubmit="return confirm('Delete this application?');" style="display:inline-block; margin-top:10px; box-shadow:none; padding:0; background:none;">
                     <button class="btn btn-danger" type="submit">Delete</button>
                 </form>
@@ -580,12 +586,35 @@ def hire_candidate(candidate_id):
 
     cursor.execute('INSERT INTO trainees (candidate_id, email, access_code) VALUES (%s, %s, %s)',
                    (candidate_id, candidate['email'], code))
-    cursor.execute('UPDATE candidates SET hired = 1 WHERE id = %s', (candidate_id,))
+    cursor.execute('UPDATE candidates SET hired = 1, status = %s WHERE id = %s',
+                   ('Onboarding', candidate_id))
     trainee_id = cursor.lastrowid
+    # Auto-assign onboarding documents
+    cursor.execute("SELECT id FROM documents WHERE phase='onboarding'")
+    onboarding_docs = cursor.fetchall()
+    for doc in onboarding_docs:
+        try:
+            cursor.execute(
+                "INSERT IGNORE INTO trainee_documents (trainee_id, document_id, status) VALUES (%s, %s, 'pending')",
+                (trainee_id, doc['id'])
+            )
+        except Exception:
+            pass
     conn.commit()
     conn.close()
     return redirect(f'/trainee/{trainee_id}')
 
+
+@app.route('/update-status/<int:candidate_id>', methods=['POST'])
+@login_required
+def update_candidate_status(candidate_id):
+    status = request.form.get('status', 'Applied')
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('UPDATE candidates SET status=%s WHERE id=%s', (status, candidate_id))
+    conn.commit()
+    conn.close()
+    return redirect('/applications')
 
 @app.route('/delete/<int:candidate_id>', methods=['POST'])
 @login_required
