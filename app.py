@@ -566,6 +566,23 @@ def dashboard():
                 <td><a class="btn btn-sm" href="/crm">View</a></td>
             </tr>'''
 
+
+    # Pre-build conditional sections to avoid f-string ternary issues
+    if recent_apps:
+        apps_section = '<table><tr><th>Name</th><th>Position</th><th>Date</th><th></th></tr>' + app_rows + '</table>'
+    else:
+        apps_section = '<p class="empty-msg">No applications yet.</p>'
+
+    if recent_trainees:
+        trainees_section = '<table><tr><th>Name</th><th>Hired</th><th></th></tr>' + trainee_rows + '</table>'
+    else:
+        trainees_section = '<p class="empty-msg">No trainees yet.</p>'
+
+    if recent_leads:
+        leads_section = '<table><tr><th>Name</th><th>Service</th><th>Status</th><th></th></tr>' + lead_rows + '</table>'
+    else:
+        leads_section = '<p class="empty-msg">No leads yet.</p>'
+
     html = STYLE + admin_nav() + f'''
     <style>
         .dash-grid {{
@@ -714,19 +731,19 @@ def dashboard():
             <!-- Applications -->
             <div class="dash-card">
                 <h2>Recent Applications <a href="/applications">View All →</a></h2>
-                {"<table><tr><th>Name</th><th>Position</th><th>Date</th><th></th></tr>" + app_rows + "</table>" if recent_apps else \'<p class="empty-msg">No applications yet.</p>\'}
+                {apps_section}
             </div>
 
             <!-- Trainees -->
             <div class="dash-card">
                 <h2>Active Trainees <a href="/trainees">View All →</a></h2>
-                {"<table><tr><th>Name</th><th>Hired</th><th></th></tr>" + trainee_rows + "</table>" if recent_trainees else \'<p class="empty-msg">No trainees yet.</p>\'}
+                {trainees_section}
             </div>
 
             <!-- CRM Leads -->
             <div class="dash-card">
                 <h2>Recent Leads <a href="/crm">View All →</a></h2>
-                {"<table><tr><th>Name</th><th>Service</th><th>Status</th><th></th></tr>" + lead_rows + "</table>" if recent_leads else \'<p class="empty-msg">No leads yet.</p>\'}
+                {leads_section}
             </div>
 
             <!-- Schedule Placeholder -->
