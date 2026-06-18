@@ -313,13 +313,14 @@ nav{background:#5C3D2E;padding:0 32px;height:56px;display:flex;align-items:cente
 <nav>
   <a href="/" class="navbar-brand">Casey's<span>Cleaning</span></a>
   <div class="navbar-links">
+    <a href="/dashboard">Dashboard</a>
     <a href="/applications">Applications</a>
     <a href="/crm">CRM</a>
     <a href="/post-job">Post a Job</a>
-    <a href="/training-modules">Training</a>
     
     <a href="/trainees">Trainees</a>
     <a href="/admin/documents">Documents</a>
+    <a href="/schedule">Scheduling</a>
     <a href="/logout">Logout</a>
   </div>
 </nav>
