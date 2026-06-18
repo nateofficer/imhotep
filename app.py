@@ -331,7 +331,7 @@ def trainee_nav():
     return '''
     <div class="nav">
         <a href="/training">My Training</a>
-        <a href="/onboarding">My Onboarding</a>
+        <a href="/trainee/documents">My Documents</a>
         <a href="/trainee-logout">Logout</a>
         <span class="trainee-badge">TRAINEE</span>
     </div>
