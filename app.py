@@ -1426,7 +1426,7 @@ def trainee_detail(trainee_id):
         <p><strong>Hired Date:</strong> {t['hired_date']}</p>
         <h3>Trainee Access Code</h3>
         <div class="access-code-display">{t['access_code']}</div>
-        <a class="btn" href="/admin/documents/assign/{trainee_id}">Assign Documents</a>
+        
         <p class="form-note">Send this code to {t['first_name']} along with the training login URL. They will use their email ({t['email']}) and this code to log in.</p>
     </div>
     '''
