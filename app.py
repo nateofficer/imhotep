@@ -2370,9 +2370,8 @@ if __name__ == '__main__':
 # ── Document Library Routes ───────────────────────────────────────────────────
 
 @app.route('/admin/documents')
+@login_required
 def admin_documents():
-    if not session.get('trainee_id'):
-        return redirect('/trainee-login')
     conn = get_db()
     cur = conn.cursor()
     cur.execute("SELECT * FROM documents ORDER BY title")
