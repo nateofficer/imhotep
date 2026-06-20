@@ -454,7 +454,7 @@ def home():
     </div>
 
     <div class="about">
-        <p>Casey's Cleaning Company keeps Las Vegas homes and businesses spotless with a trained, background-checked team you can trust. Whether it's a one-time deep clean, a recurring service, or a short-term rental turnover, we treat every property like it's our own.</p>
+        <p>Casey's Cleaning Company keeps Las Vegas homes and businesses spotless with a trained, background-checked team you can trust. Whether it's a one-time deep clean, a recurring service, or a short-term rental turnover, we treat every property like it's our own. (Placeholder text -- Nate, edit this paragraph to say whatever you'd like about the company.)</p>
     </div>
     '''
 
