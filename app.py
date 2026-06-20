@@ -1404,21 +1404,9 @@ def trainee_detail(trainee_id):
         conn.close()
         return redirect('/trainees')
 
-    cursor.execute('SELECT * FROM training_modules ORDER BY created_date')
-    modules = cursor.fetchall()
-    cursor.execute('SELECT * FROM module_progress WHERE trainee_id = %s', (trainee_id,))
-    progress_rows = cursor.fetchall()
-    progress = {p['module_id']: p for p in progress_rows}
-
-    cursor.execute('SELECT COUNT(*) as cnt FROM training_modules WHERE required = 1')
-    required_count = cursor.fetchone()['cnt']
-    passed_required = sum(1 for m in modules if m['required'] and progress.get(m['id']) and progress[m['id']]['passed'])
-    certified = passed_required >= required_count and required_count > 0
     conn.close()
 
-    cert_html = '<span class="cert-badge">CERTIFIED</span>' if certified else ''
-
-    html = STYLE + admin_nav() + f'<h1>{t["first_name"]} {t["last_name"]} {cert_html}</h1>'
+    html = STYLE + admin_nav() + f'<h1>{t["first_name"]} {t["last_name"]}</h1>'
     html += f'''
     <div class="application">
         <p><strong>Email:</strong> {t['email']}</p>
@@ -1430,30 +1418,6 @@ def trainee_detail(trainee_id):
         <p class="form-note">Send this code to {t['first_name']} along with the training login URL. They will use their email ({t['email']}) and this code to log in.</p>
     </div>
     '''
-
-    html += '<h2>Module Progress</h2>'
-    if not modules:
-        html += '<p>No training modules created yet.</p>'
-    else:
-        for m in modules:
-            p = progress.get(m['id'])
-            if p and p['passed']:
-                status = '<span class="status-label status-passed">PASSED</span>'
-                card_class = 'module-card passed'
-            elif p and p['attempts'] > 0:
-                status = f'<span class="status-label status-failed">Attempted ({p["attempts"]}x)</span>'
-                card_class = 'module-card failed'
-            else:
-                status = '<span class="status-label status-not-started">Not Started</span>'
-                card_class = 'module-card'
-
-            req_label = '(Required)' if m['required'] else '(Optional)'
-            html += f'''
-            <div class="{card_class}">
-                <h3>{m['title']} {req_label}</h3>
-                <p>{status}</p>
-            </div>
-            '''
     return html
 
 
