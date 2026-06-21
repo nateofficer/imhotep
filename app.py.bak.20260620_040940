@@ -292,7 +292,7 @@ STYLE = '''
 def public_nav():
     return '''
     <div class="nav">
-        <a href="/jobs">View Jobs</a>
+        <a href="/">View Jobs</a>
         <a href="/quote">Request a Quote</a>
         <a href="/login">Admin Login</a>
         <a href="/trainee-login">Trainee Login</a>
@@ -426,51 +426,6 @@ def run_doc_library_migration():
 # ── End DB Migration ──────────────────────────────────────────────────────────
 
 @app.route('/')
-def home():
-    if session.get('logged_in'):
-        top_nav = admin_nav()
-    elif session.get('trainee_id'):
-        top_nav = trainee_nav()
-    else:
-        top_nav = ''
-
-    html = STYLE + top_nav + '''
-    <style>
-    .hero { text-align:center; padding: 60px 20px 30px; }
-    .hero h1 { font-size: 34px; color:#2c3e50; margin-bottom: 10px; }
-    .hero p { color:#555; font-size:16px; margin-bottom: 28px; }
-    .quote-btn-large { display:inline-block; background:#3498db; color:#fff; font-size:20px; font-weight:bold; padding:18px 50px; border-radius:8px; text-decoration:none; }
-    .quote-btn-large:hover { background:#2980b9; }
-    .about { max-width:680px; margin: 0 auto 50px; text-align:center; color:#444; line-height:1.7; padding: 0 20px; }
-    .footer-nav { text-align:center; padding:24px; border-top:1px solid #eee; }
-    .footer-nav a { font-size:13px; color:#888; margin:0 14px; text-decoration:none; }
-    .footer-nav a:hover { color:#3498db; text-decoration:underline; }
-    </style>
-
-    <div class="hero">
-        <h1>Casey's Cleaning Company</h1>
-        <p>Reliable, detail-oriented residential &amp; commercial cleaning, proudly serving Las Vegas.</p>
-        <a class="quote-btn-large" href="/quote">Request a Quote</a>
-    </div>
-
-    <div class="about">
-        <p>Casey's Cleaning Company keeps Las Vegas homes and businesses spotless with a trained, background-checked team you can trust. Whether it's a one-time deep clean, a recurring service, or a short-term rental turnover, we treat every property like it's our own.</p>
-    </div>
-    '''
-
-    if not session.get('logged_in') and not session.get('trainee_id'):
-        html += '''
-    <div class="footer-nav">
-        <a href="/jobs">View Jobs</a>
-        <a href="/login">Admin Login</a>
-        <a href="/trainee-login">Trainee Login</a>
-    </div>
-    '''
-
-    return html
-
-
-@app.route('/jobs')
 def show_jobs():
     conn = get_db()
     cursor = conn.cursor()
@@ -965,7 +920,7 @@ def post_job():
                         request.form['location']))
         conn.commit()
         conn.close()
-        return redirect('/jobs')
+        return redirect('/')
 
     return STYLE + admin_nav() + '''
     <h1>Post a New Job</h1>
@@ -1050,13 +1005,13 @@ def apply(job_id):
         return STYLE + public_nav() + '''
         <h1>Thank You!</h1>
         <p>Your application has been submitted successfully. We will review it and be in touch soon.</p>
-        <a class="btn" href="/jobs">Back to Jobs</a>
+        <a class="btn" href="/">Back to Jobs</a>
         '''
 
     conn.close()
 
     if not job:
-        return STYLE + public_nav() + '<h1>Job not found</h1><a href="/jobs">Back</a>'
+        return STYLE + public_nav() + '<h1>Job not found</h1><a href="/">Back</a>'
 
     return STYLE + public_nav() + f'''
     <h1>Apply: {job['title']}</h1>
@@ -2371,6 +2326,11 @@ def quote_request():
     return render_template('quote.html')
 
 
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
+
+
 # ── Document Library Routes ───────────────────────────────────────────────────
 
 @app.route('/admin/documents')
@@ -2508,7 +2468,7 @@ def trainee_documents():
     conn = get_db()
     cur = conn.cursor()
     cur.execute("""
-        SELECT td.id as assignment_id, d.title, d.doc_type, d.drive_link, d.file_url, d.description,
+        SELECT td.id as assignment_id, d.title, d.doc_type, d.drive_link, d.description,
                td.status, td.signed_date, td.verified_date, td.verified_by
         FROM trainee_documents td
         JOIN documents d ON td.document_id = d.id
@@ -2534,7 +2494,7 @@ def trainee_sign_document(assignment_id):
         conn.commit()
         return redirect('/trainee/documents')
     cur.execute("""
-        SELECT td.*, d.title, d.drive_link, d.file_url, d.description
+        SELECT td.*, d.title, d.drive_link, d.description
         FROM trainee_documents td
         JOIN documents d ON td.document_id = d.id
         WHERE td.id=%s
@@ -2543,8 +2503,3 @@ def trainee_sign_document(assignment_id):
     return render_template('trainee_sign_document.html', assignment=assignment)
 
 # ── End Document Library Routes ───────────────────────────────────────────────
-
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)

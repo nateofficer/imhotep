@@ -454,7 +454,7 @@ def home():
     </div>
 
     <div class="about">
-        <p>Casey's Cleaning Company keeps Las Vegas homes and businesses spotless with a trained, background-checked team you can trust. Whether it's a one-time deep clean, a recurring service, or a short-term rental turnover, we treat every property like it's our own.</p>
+        <p>Casey's Cleaning Company keeps Las Vegas homes and businesses spotless with a trained, background-checked team you can trust. Whether it's a one-time deep clean, a recurring service, or a short-term rental turnover, we treat every property like it's our own. (Placeholder text -- Nate, edit this paragraph to say whatever you'd like about the company.)</p>
     </div>
     '''
 
@@ -2371,6 +2371,11 @@ def quote_request():
     return render_template('quote.html')
 
 
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
+
+
 # ── Document Library Routes ───────────────────────────────────────────────────
 
 @app.route('/admin/documents')
@@ -2508,7 +2513,7 @@ def trainee_documents():
     conn = get_db()
     cur = conn.cursor()
     cur.execute("""
-        SELECT td.id as assignment_id, d.title, d.doc_type, d.drive_link, d.file_url, d.description,
+        SELECT td.id as assignment_id, d.title, d.doc_type, d.drive_link, d.description,
                td.status, td.signed_date, td.verified_date, td.verified_by
         FROM trainee_documents td
         JOIN documents d ON td.document_id = d.id
@@ -2534,7 +2539,7 @@ def trainee_sign_document(assignment_id):
         conn.commit()
         return redirect('/trainee/documents')
     cur.execute("""
-        SELECT td.*, d.title, d.drive_link, d.file_url, d.description
+        SELECT td.*, d.title, d.drive_link, d.description
         FROM trainee_documents td
         JOIN documents d ON td.document_id = d.id
         WHERE td.id=%s
@@ -2543,8 +2548,3 @@ def trainee_sign_document(assignment_id):
     return render_template('trainee_sign_document.html', assignment=assignment)
 
 # ── End Document Library Routes ───────────────────────────────────────────────
-
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)

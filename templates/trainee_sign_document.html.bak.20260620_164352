@@ -94,13 +94,12 @@
 
 <h1 class="page-title">Sign: {{ assignment.title }}</h1>
 
-{% set doc_link = assignment.drive_link or assignment.file_url %}
-{% if doc_link %}
+{% if assignment.drive_link %}
 <div class="card" style="padding:20px;margin-bottom:20px;display:flex;align-items:center;gap:16px;">
   <span style="font-size:24px;">&#128196;</span>
   <div>
     <div style="font-weight:700;margin-bottom:4px;">Review this document before signing</div>
-    <a href="{{ doc_link }}" target="_blank" class="btn btn-sage" style="font-size:13px;">
+    <a href="{{ assignment.drive_link }}" target="_blank" class="btn btn-sage" style="font-size:13px;">
       Open Document
     </a>
   </div>

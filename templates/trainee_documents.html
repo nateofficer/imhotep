@@ -114,8 +114,9 @@
       </div>
     </div>
     <div style="display:flex;gap:10px;flex-shrink:0;">
-      {% if doc.drive_link %}
-      <a href="{{ doc.drive_link }}" target="_blank" class="btn btn-sage">View</a>
+      {% set doc_link = doc.drive_link or doc.file_url %}
+      {% if doc_link %}
+      <a href="{{ doc_link }}" target="_blank" class="btn btn-sage">View</a>
       {% endif %}
       {% if doc.doc_type == 'signable' and doc.status == 'pending' %}
       <a href="/trainee/documents/sign/{{ doc.assignment_id }}" class="btn">Sign</a>

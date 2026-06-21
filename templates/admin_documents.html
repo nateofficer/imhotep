@@ -130,8 +130,9 @@
         </td>
         <td style="display:flex;gap:12px;align-items:center;">
           <a href="/admin/documents/edit/{{ doc.id }}" style="color:var(--terracotta);font-weight:700;">Edit</a>
-          {% if doc.drive_link %}
-          <a href="{{ doc.drive_link }}" target="_blank" style="color:var(--sage);font-weight:700;">View</a>
+          {% set doc_link = doc.drive_link or doc.file_url %}
+          {% if doc_link %}
+          <a href="{{ doc_link }}" target="_blank" style="color:var(--sage);font-weight:700;">View</a>
           {% endif %}
         </td>
       </tr>

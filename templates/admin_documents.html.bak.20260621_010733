@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sign Document — Imhotep</title>
+<title>Document Library — Imhotep</title>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -86,79 +86,67 @@
 <nav>
   <a href="/" class="navbar-brand">Casey's<span>Cleaning</span></a>
   <div class="navbar-links">
-    <a href="/trainee/documents">My Documents</a>
-    <a href="/trainee-logout">Logout</a>
+    <a href="/applications">Applications</a>
+    <a href="/trainees">Trainees</a>
+    <a href="/admin/documents">Documents</a>
+    <a href="/logout">Logout</a>
   </div>
 </nav>
 <div class="main">
 
-<h1 class="page-title">Sign: {{ assignment.title }}</h1>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+  <h1 class="page-title" style="border:none;margin:0;">Document Library</h1>
+  <a href="/admin/documents/add" class="btn">+ Add Document</a>
+</div>
 
-{% set doc_link = assignment.drive_link or assignment.file_url %}
-{% if doc_link %}
-<div class="card" style="padding:20px;margin-bottom:20px;display:flex;align-items:center;gap:16px;">
-  <span style="font-size:24px;">&#128196;</span>
-  <div>
-    <div style="font-weight:700;margin-bottom:4px;">Review this document before signing</div>
-    <a href="{{ doc_link }}" target="_blank" class="btn btn-sage" style="font-size:13px;">
-      Open Document
-    </a>
+{% if documents %}
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Type</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for doc in documents %}
+      <tr>
+        <td><strong>{{ doc.title }}</strong></td>
+        <td>
+          {% if doc.doc_type == 'signable' %}
+            <span class="badge badge-green">Signable</span>
+          {% else %}
+            <span class="badge badge-orange">Admin Verified</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if doc.active %}
+            <span style="color:#27ae60;">&#9679; Active</span>
+          {% else %}
+            <span style="color:#e74c3c;">&#9679; Inactive</span>
+          {% endif %}
+        </td>
+        <td style="display:flex;gap:12px;align-items:center;">
+          <a href="/admin/documents/edit/{{ doc.id }}" style="color:var(--terracotta);font-weight:700;">Edit</a>
+          {% if doc.drive_link %}
+          <a href="{{ doc.drive_link }}" target="_blank" style="color:var(--sage);font-weight:700;">View</a>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card">
+  <div class="empty-state">
+    <p>No documents in your library yet.</p>
+    <a href="/admin/documents/add" class="btn">Add Your First Document</a>
   </div>
 </div>
 {% endif %}
-
-<div class="card" style="padding:30px;">
-  <p style="font-weight:700;margin-bottom:16px;color:var(--warm-brown);">
-    Sign below to confirm you have read and agree to this document:
-  </p>
-
-  <canvas id="signatureCanvas" width="700" height="200"
-          style="border:2px solid var(--border);border-radius:8px;
-                 cursor:crosshair;touch-action:none;width:100%;
-                 background:white;"></canvas>
-
-  <div style="margin-top:12px;">
-    <button onclick="clearSig()" class="btn btn-muted" style="font-size:13px;">Clear</button>
-  </div>
-
-  <form method="POST" style="margin-top:24px;">
-    <input type="hidden" name="signature_data" id="signatureData">
-    <button type="submit" onclick="return captureSignature()" class="btn"
-            style="width:100%;padding:14px;font-size:16px;justify-content:center;">
-      Submit Signature
-    </button>
-  </form>
-</div>
-
-<script>
-const canvas = document.getElementById('signatureCanvas');
-const ctx = canvas.getContext('2d');
-let drawing = false;
-
-function getPos(e) {
-  const rect = canvas.getBoundingClientRect();
-  const scaleX = canvas.width / rect.width;
-  const scaleY = canvas.height / rect.height;
-  if (e.touches) {
-    return { x: (e.touches[0].clientX - rect.left) * scaleX, y: (e.touches[0].clientY - rect.top) * scaleY };
-  }
-  return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
-}
-
-canvas.addEventListener('mousedown', e => { drawing = true; ctx.beginPath(); const p = getPos(e); ctx.moveTo(p.x, p.y); });
-canvas.addEventListener('mousemove', e => { if (!drawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.strokeStyle = '#5C3D2E'; ctx.lineWidth = 2; ctx.stroke(); });
-canvas.addEventListener('mouseup', () => drawing = false);
-canvas.addEventListener('mouseleave', () => drawing = false);
-canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing = true; ctx.beginPath(); const p = getPos(e); ctx.moveTo(p.x, p.y); });
-canvas.addEventListener('touchmove', e => { e.preventDefault(); if (!drawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.strokeStyle = '#5C3D2E'; ctx.lineWidth = 2; ctx.stroke(); });
-canvas.addEventListener('touchend', () => drawing = false);
-
-function clearSig() { ctx.clearRect(0, 0, canvas.width, canvas.height); }
-function captureSignature() {
-  document.getElementById('signatureData').value = canvas.toDataURL();
-  return true;
-}
-</script>
 
 </div>
 </body>
