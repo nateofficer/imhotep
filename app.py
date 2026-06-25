@@ -2416,6 +2416,18 @@ def admin_add_document():
     return render_template('admin_document_form.html', doc=None)
 
 
+@app.route('/admin/documents/delete/<int:doc_id>')
+def delete_document(doc_id):
+    if not session.get('logged_in'):
+        return redirect('/login')
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM documents WHERE id=%s", (doc_id,))
+    conn.commit()
+    return redirect('/admin/documents')
+
+
 @app.route('/admin/documents/edit/<int:doc_id>', methods=['GET', 'POST'])
 def admin_edit_document(doc_id):
     if not session.get('logged_in'):

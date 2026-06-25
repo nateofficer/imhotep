@@ -134,6 +134,7 @@
           {% if doc_link %}
           <a href="{{ doc_link }}" target="_blank" style="color:var(--sage);font-weight:700;">View</a>
           {% endif %}
+        <a href="/admin/documents/delete/{{ doc.id }}" onclick="return confirm('Delete this document?')" style="color:#c0392b;font-weight:700;margin-left:8px;">Delete</a>
         </td>
       </tr>
       {% endfor %}
