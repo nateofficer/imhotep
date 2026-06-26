@@ -2408,8 +2408,8 @@ def admin_add_document():
         conn = get_db()
         cur = conn.cursor()
         cur.execute(
-            "INSERT INTO documents (title, doc_type, drive_link, file_url, description) VALUES (%s, %s, %s, %s, %s)",
-            (title, doc_type, drive_link, file_url, description)
+            "INSERT INTO documents (title, doc_type, drive_link, file_url, description, active) VALUES (%s, %s, %s, %s, %s, %s)",
+            (title, doc_type, drive_link, file_url, description, 1)
         )
         conn.commit()
         return redirect('/admin/documents')
