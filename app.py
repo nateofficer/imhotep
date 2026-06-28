@@ -306,7 +306,7 @@ def admin_nav():
 nav{background:#5C3D2E;padding:0 20px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
 .navbar-brand{font-family:'Lora',serif;font-size:20px;color:#FFF9F0;font-weight:600;letter-spacing:0.5px;text-decoration:none;flex-shrink:0;}
 .navbar-brand span{color:#D4A843;}
-.navbar-links{display:flex;align-items:center;gap:2px;flex:1 1 auto;min-width:0;overflow-x:auto;justify-content:flex-end;scrollbar-width:thin;}
+.navbar-links{display:flex;align-items:center;gap:2px;flex:1 1 auto;min-width:0;overflow-x:auto;justify-content:flex-start;scrollbar-width:thin;}
 .navbar-links a{font-size:13px;font-weight:700;color:rgba(255,249,240,0.72);text-decoration:none;padding:6px 9px;border-radius:6px;white-space:nowrap;flex-shrink:0;}
 .navbar-links a:hover{background:rgba(255,249,240,0.12);color:#FFF9F0;}
 </style>
