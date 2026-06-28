@@ -10,6 +10,8 @@ import string
 import json
 from functools import wraps
 from dotenv import load_dotenv
+from datetime import datetime, timedelta
+import calendar
 
 load_dotenv()
 
@@ -2591,6 +2593,39 @@ def save_job_crew(cursor, job_id, form):
             )
 
 
+def next_recurrence_date(base_date, recurrence_rule):
+    '''Given a job's date and its recurrence pattern, return the next occurrence's date.'''
+    if recurrence_rule == 'weekly':
+        return base_date + timedelta(days=7)
+    elif recurrence_rule == 'biweekly':
+        return base_date + timedelta(days=14)
+    elif recurrence_rule == 'monthly':
+        month = base_date.month + 1
+        year = base_date.year
+        if month > 12:
+            month = 1
+            year += 1
+        day = min(base_date.day, calendar.monthrange(year, month)[1])
+        return base_date.replace(year=year, month=month, day=day)
+    return None
+
+
+def create_next_occurrence(cursor, customer_id, scheduled_date_str, scheduled_time, service_type, recurrence_rule, price, form):
+    '''Creates the next visit for a recurring job, in Pending Confirmation status,
+    carrying forward the same crew -- nothing here books itself; it just waits
+    until you've actually confirmed the date with the client.'''
+    base_date = datetime.strptime(scheduled_date_str, '%Y-%m-%d').date()
+    next_date = next_recurrence_date(base_date, recurrence_rule)
+    if not next_date:
+        return
+    cursor.execute('''INSERT INTO cleaning_jobs
+        (customer_id, scheduled_date, scheduled_time, service_type, status, recurrence_rule, price, notes)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)''',
+        (customer_id, next_date, scheduled_time, service_type, 'pending_confirmation', recurrence_rule, price, ''))
+    new_job_id = cursor.lastrowid
+    save_job_crew(cursor, new_job_id, form)
+
+
 def job_form_html(job, crew_by_role, lead_role, customers, roster, action_url, title, submit_label):
     customer_options = '<option value="">-- Select customer --</option>'
     for c in customers:
@@ -2667,6 +2702,7 @@ def schedule_list():
         SELECT cleaning_jobs.*, customers.first_name as cust_first, customers.last_name as cust_last
         FROM cleaning_jobs
         JOIN customers ON cleaning_jobs.customer_id = customers.id
+        WHERE cleaning_jobs.status != 'pending_confirmation'
         ORDER BY cleaning_jobs.scheduled_date ASC, cleaning_jobs.scheduled_time ASC
     ''')
     jobs = cursor.fetchall()
@@ -2725,15 +2761,21 @@ def schedule_new():
     cursor = conn.cursor()
 
     if request.method == 'POST':
+        new_status = request.form.get('status', 'scheduled')
+        recurrence_rule = request.form.get('recurrence_rule', 'one_time')
         cursor.execute('''INSERT INTO cleaning_jobs
             (customer_id, scheduled_date, scheduled_time, service_type, status, recurrence_rule, price, notes)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)''',
             (request.form['customer_id'], request.form['scheduled_date'],
              request.form.get('scheduled_time') or None, request.form.get('service_type', ''),
-             request.form.get('status', 'scheduled'), request.form.get('recurrence_rule', 'one_time'),
+             new_status, recurrence_rule,
              request.form.get('price') or None, request.form.get('notes', '')))
         job_id = cursor.lastrowid
         save_job_crew(cursor, job_id, request.form)
+        if new_status == 'completed' and recurrence_rule != 'one_time':
+            create_next_occurrence(cursor, request.form['customer_id'], request.form['scheduled_date'],
+                                    request.form.get('scheduled_time') or None, request.form.get('service_type', ''),
+                                    recurrence_rule, request.form.get('price') or None, request.form)
         conn.commit()
         conn.close()
         return redirect('/schedule')
@@ -2758,13 +2800,20 @@ def schedule_edit(job_id):
         return redirect('/schedule')
 
     if request.method == 'POST':
+        old_status = job['status']
+        new_status = request.form.get('status', 'scheduled')
+        recurrence_rule = request.form.get('recurrence_rule', 'one_time')
         cursor.execute('''UPDATE cleaning_jobs SET customer_id=%s, scheduled_date=%s, scheduled_time=%s,
             service_type=%s, status=%s, recurrence_rule=%s, price=%s, notes=%s WHERE id=%s''',
             (request.form['customer_id'], request.form['scheduled_date'],
              request.form.get('scheduled_time') or None, request.form.get('service_type', ''),
-             request.form.get('status', 'scheduled'), request.form.get('recurrence_rule', 'one_time'),
+             new_status, recurrence_rule,
              request.form.get('price') or None, request.form.get('notes', ''), job_id))
         save_job_crew(cursor, job_id, request.form)
+        if old_status != 'completed' and new_status == 'completed' and recurrence_rule != 'one_time':
+            create_next_occurrence(cursor, request.form['customer_id'], request.form['scheduled_date'],
+                                    request.form.get('scheduled_time') or None, request.form.get('service_type', ''),
+                                    recurrence_rule, request.form.get('price') or None, request.form)
         conn.commit()
         conn.close()
         return redirect('/schedule')
