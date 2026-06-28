@@ -570,6 +570,23 @@ def dashboard():
     cursor.execute('SELECT COUNT(*) as cnt FROM leads')
     lead_count = cursor.fetchone()['cnt']
 
+    # Upcoming cleaning jobs (scheduled/in progress, today or later)
+    cursor.execute('''
+        SELECT cleaning_jobs.*, customers.first_name as cust_first, customers.last_name as cust_last
+        FROM cleaning_jobs
+        JOIN customers ON cleaning_jobs.customer_id = customers.id
+        WHERE cleaning_jobs.scheduled_date >= CURDATE()
+          AND cleaning_jobs.status IN ('scheduled', 'in_progress')
+        ORDER BY cleaning_jobs.scheduled_date ASC, cleaning_jobs.scheduled_time ASC
+        LIMIT 5
+    ''')
+    recent_jobs = cursor.fetchall()
+    cursor.execute('''
+        SELECT COUNT(*) as cnt FROM cleaning_jobs
+        WHERE scheduled_date >= CURDATE() AND status IN ('scheduled', 'in_progress')
+    ''')
+    job_count = cursor.fetchone()['cnt']
+
     conn.close()
 
     # Build application rows
@@ -614,6 +631,21 @@ def dashboard():
             </tr>'''
 
 
+    # Build upcoming job rows
+    job_rows = ''
+    for j in recent_jobs:
+        cust_name = f"{j['cust_first']} {j['cust_last']}"
+        job_date = str(j['scheduled_date'])
+        job_time = format_job_time(j['scheduled_time'])
+        badge = job_status_badge(j['status'])
+        job_rows += f'''
+            <tr>
+                <td>{cust_name}</td>
+                <td>{job_date} {job_time}</td>
+                <td>{badge}</td>
+                <td><a class="btn btn-sm" href="/schedule">View</a></td>
+            </tr>'''
+
     # Pre-build conditional sections to avoid f-string ternary issues
     if recent_apps:
         apps_section = '<table><tr><th>Name</th><th>Position</th><th>Date</th><th></th></tr>' + app_rows + '</table>'
@@ -629,6 +661,11 @@ def dashboard():
         leads_section = '<table><tr><th>Name</th><th>Service</th><th>Status</th><th></th></tr>' + lead_rows + '</table>'
     else:
         leads_section = '<p class="empty-msg">No leads yet.</p>'
+
+    if recent_jobs:
+        schedule_section = '<table><tr><th>Customer</th><th>Date</th><th>Status</th><th></th></tr>' + job_rows + '</table>'
+    else:
+        schedule_section = '<p class="empty-msg">No upcoming jobs scheduled.</p>'
 
     html = STYLE + admin_nav() + f'''
     <style>
@@ -765,10 +802,10 @@ def dashboard():
                 <div class="stat-number">{lead_count}</div>
                 <div class="stat-label">CRM Leads</div>
             </a>
-            <a class="dash-stat" href="/schedule" style="border-left-color:#b0bec5;opacity:0.7;cursor:default;">
+            <a class="dash-stat" href="/schedule">
                 <div class="stat-icon">📅</div>
-                <div class="stat-number">—</div>
-                <div class="stat-label">Upcoming Jobs <span style="font-size:0.75rem;">(coming soon)</span></div>
+                <div class="stat-number">{job_count}</div>
+                <div class="stat-label">Upcoming Jobs</div>
             </a>
         </div>
 
@@ -793,13 +830,10 @@ def dashboard():
                 {leads_section}
             </div>
 
-            <!-- Schedule Placeholder -->
+            <!-- Upcoming Schedule -->
             <div class="dash-card">
-                <h2>Upcoming Schedule</h2>
-                <div class="schedule-placeholder">
-                    <div class="big-icon">🗓️</div>
-                    <p>Scheduling module coming soon.</p>
-                </div>
+                <h2>Upcoming Schedule <a href="/schedule">View All →</a></h2>
+                {schedule_section}
             </div>
 
         </div>
