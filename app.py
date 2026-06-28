@@ -809,6 +809,11 @@ def dashboard():
                 <div class="stat-number">{job_count}</div>
                 <div class="stat-label">Upcoming Jobs</div>
             </a>
+            <a class="dash-stat" href="https://qbo.intuit.com/" target="_blank" rel="noopener noreferrer">
+                <div class="stat-icon">💰</div>
+                <div class="stat-number" style="font-size:1.7rem;">QuickBooks</div>
+                <div class="stat-label">Sign in to manage billing</div>
+            </a>
         </div>
 
         <!-- Detail Cards -->
