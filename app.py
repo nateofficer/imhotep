@@ -2258,6 +2258,20 @@ def crm_list():
     return html
 
 
+def get_marketing_sources_options(selected_id=None):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT id, name FROM marketing_sources ORDER BY name')
+    sources = cursor.fetchall()
+    conn.close()
+    selected_id = str(selected_id) if selected_id else ''
+    options = '<option value="">-- Not specified --</option>'
+    for s in sources:
+        sel = 'selected' if str(s['id']) == selected_id else ''
+        options += f'<option value="{s["id"]}" {sel}>{s["name"]}</option>'
+    return options
+
+
 @app.route('/crm/new', methods=['GET', 'POST'])
 @login_required
 def crm_new():
@@ -2265,17 +2279,19 @@ def crm_new():
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''INSERT INTO leads
-                          (first_name, last_name, phone, email, address, service_type, status, notes)
-                          VALUES (%s, %s, %s, %s, %s, %s, %s, %s)''',
+                          (first_name, last_name, phone, email, address, service_type, status, notes, lead_source_id)
+                          VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)''',
                        (request.form['first_name'], request.form['last_name'],
                         request.form.get('phone', ''), request.form.get('email', ''),
                         request.form.get('address', ''), request.form.get('service_type', ''),
-                        request.form.get('status', 'new'), request.form.get('notes', '')))
+                        request.form.get('status', 'new'), request.form.get('notes', ''),
+                        request.form.get('lead_source_id') or None))
         conn.commit()
         conn.close()
         return redirect('/crm')
 
     service_options = ''.join(f'<option value="{s}">{s}</option>' for s in SERVICE_TYPES)
+    lead_source_options = get_marketing_sources_options()
     return STYLE + admin_nav() + f'''
     <h1>Add New Lead</h1>
     <form method="POST">
@@ -2289,6 +2305,8 @@ def crm_new():
         <input type="email" name="email">
         <label>Address:</label>
         <input type="text" name="address" placeholder="Street, City, State">
+        <label>Lead Source (how did they hear about us?):</label>
+        <select name="lead_source_id">{lead_source_options}</select>
         <label>Service Type:</label>
         <select name="service_type">
             <option value="">-- Select service --</option>
@@ -2321,11 +2339,12 @@ def crm_edit(lead_id):
 
     if request.method == 'POST':
         cursor.execute('''UPDATE leads SET first_name=%s, last_name=%s, phone=%s, email=%s,
-                          address=%s, service_type=%s, status=%s, notes=%s WHERE id=%s''',
+                          address=%s, service_type=%s, status=%s, notes=%s, lead_source_id=%s WHERE id=%s''',
                        (request.form['first_name'], request.form['last_name'],
                         request.form.get('phone', ''), request.form.get('email', ''),
                         request.form.get('address', ''), request.form.get('service_type', ''),
-                        request.form.get('status', 'new'), request.form.get('notes', ''), lead_id))
+                        request.form.get('status', 'new'), request.form.get('notes', ''),
+                        request.form.get('lead_source_id') or None, lead_id))
         conn.commit()
         conn.close()
         return redirect('/crm')
@@ -2339,6 +2358,7 @@ def crm_edit(lead_id):
     for val, (label, color) in STATUS_LABELS.items():
         sel = 'selected' if lead['status'] == val else ''
         status_options += f'<option value="{val}" {sel}>{label}</option>'
+    lead_source_options = get_marketing_sources_options(lead.get('lead_source_id'))
 
     return STYLE + admin_nav() + f'''
     <h1>Edit Lead: {lead["first_name"]} {lead["last_name"]}</h1>
@@ -2353,6 +2373,8 @@ def crm_edit(lead_id):
         <input type="email" name="email" value="{lead['email'] or ''}">
         <label>Address:</label>
         <input type="text" name="address" value="{lead['address'] or ''}">
+        <label>Lead Source:</label>
+        <select name="lead_source_id">{lead_source_options}</select>
         <label>Service Type:</label>
         <select name="service_type">
             <option value="">-- Select service --</option>
@@ -2451,17 +2473,19 @@ def customers_new():
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''INSERT INTO customers
-                          (first_name, last_name, phone, email, address, active)
-                          VALUES (%s, %s, %s, %s, %s, %s)''',
+                          (first_name, last_name, phone, email, address, active, lead_source_id)
+                          VALUES (%s, %s, %s, %s, %s, %s, %s)''',
                        (request.form['first_name'], request.form['last_name'],
                         request.form.get('phone', ''), request.form.get('email', ''),
                         request.form.get('address', ''),
-                        1 if request.form.get('active') == 'on' else 0))
+                        1 if request.form.get('active') == 'on' else 0,
+                        request.form.get('lead_source_id') or None))
         conn.commit()
         conn.close()
         return redirect('/customers')
 
-    return STYLE + admin_nav() + '''
+    lead_source_options = get_marketing_sources_options()
+    return STYLE + admin_nav() + f'''
     <h1>Add New Customer</h1>
     <form method="POST">
         <label>First Name:</label>
@@ -2474,6 +2498,8 @@ def customers_new():
         <input type="email" name="email">
         <label>Address:</label>
         <input type="text" name="address" placeholder="Street, City, State">
+        <label>Lead Source:</label>
+        <select name="lead_source_id">{lead_source_options}</select>
         <label><input type="checkbox" name="active" checked style="width:auto;display:inline-block;margin-right:6px;">Active customer</label>
         <button class="btn btn-success" type="submit">Save Customer</button>
         <a class="btn" href="/customers" style="background:#95a5a6;">Cancel</a>
@@ -2494,17 +2520,19 @@ def customers_edit(customer_id):
 
     if request.method == 'POST':
         cursor.execute('''UPDATE customers SET first_name=%s, last_name=%s, phone=%s,
-                          email=%s, address=%s, active=%s WHERE id=%s''',
+                          email=%s, address=%s, active=%s, lead_source_id=%s WHERE id=%s''',
                        (request.form['first_name'], request.form['last_name'],
                         request.form.get('phone', ''), request.form.get('email', ''),
                         request.form.get('address', ''),
-                        1 if request.form.get('active') == 'on' else 0, customer_id))
+                        1 if request.form.get('active') == 'on' else 0,
+                        request.form.get('lead_source_id') or None, customer_id))
         conn.commit()
         conn.close()
         return redirect('/customers')
 
     conn.close()
     checked = 'checked' if customer['active'] else ''
+    lead_source_options = get_marketing_sources_options(customer.get('lead_source_id'))
     return STYLE + admin_nav() + f'''
     <h1>Edit Customer: {customer["first_name"]} {customer["last_name"]}</h1>
     <form method="POST">
@@ -2518,6 +2546,8 @@ def customers_edit(customer_id):
         <input type="email" name="email" value="{customer['email'] or ''}">
         <label>Address:</label>
         <input type="text" name="address" value="{customer['address'] or ''}">
+        <label>Lead Source:</label>
+        <select name="lead_source_id">{lead_source_options}</select>
         <label><input type="checkbox" name="active" {checked} style="width:auto;display:inline-block;margin-right:6px;">Active customer</label>
         <button class="btn btn-success" type="submit">Save Changes</button>
         <a class="btn" href="/customers" style="background:#95a5a6;">Cancel</a>
