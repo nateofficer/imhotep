@@ -303,11 +303,11 @@ def public_nav():
 def admin_nav():
     return '''
 <style>
-nav{background:#5C3D2E;padding:0 32px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
-.navbar-brand{font-family:'Lora',serif;font-size:20px;color:#FFF9F0;font-weight:600;letter-spacing:0.5px;text-decoration:none;}
+nav{background:#5C3D2E;padding:0 20px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+.navbar-brand{font-family:'Lora',serif;font-size:20px;color:#FFF9F0;font-weight:600;letter-spacing:0.5px;text-decoration:none;flex-shrink:0;}
 .navbar-brand span{color:#D4A843;}
-.navbar-links{display:flex;align-items:center;gap:4px;}
-.navbar-links a{font-size:13px;font-weight:700;color:rgba(255,249,240,0.72);text-decoration:none;padding:6px 12px;border-radius:6px;white-space:nowrap;}
+.navbar-links{display:flex;align-items:center;gap:2px;flex:1 1 auto;min-width:0;overflow-x:auto;justify-content:flex-end;scrollbar-width:thin;}
+.navbar-links a{font-size:13px;font-weight:700;color:rgba(255,249,240,0.72);text-decoration:none;padding:6px 9px;border-radius:6px;white-space:nowrap;flex-shrink:0;}
 .navbar-links a:hover{background:rgba(255,249,240,0.12);color:#FFF9F0;}
 </style>
 <nav>
@@ -316,6 +316,7 @@ nav{background:#5C3D2E;padding:0 32px;height:56px;display:flex;align-items:cente
     <a href="/dashboard">Dashboard</a>
     <a href="/applications">Applications</a>
     <a href="/crm">CRM</a>
+    <a href="/customers">Customers</a>
     <a href="/post-job">Post a Job</a>
     
     <a href="/trainees">Trainees</a>
@@ -2369,6 +2370,395 @@ def quote_request():
         return render_template('quote_thanks.html', name=first_name, estimate=estimate)
 
     return render_template('quote.html')
+
+
+@app.route('/customers')
+@login_required
+def customers_list():
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM customers ORDER BY created_date DESC')
+    customers = cursor.fetchall()
+    conn.close()
+
+    html = STYLE + admin_nav() + '<h1>Customers</h1>'
+    html += '<p><a class="btn btn-success" href="/customers/new">+ Add Customer</a></p>'
+
+    if not customers:
+        html += '<div class="info"><p>No customers yet. Add one manually to get started.</p></div>'
+    else:
+        for c in customers:
+            active_label = 'Active' if c['active'] else 'Inactive'
+            active_color = '#27ae60' if c['active'] else '#95a5a6'
+            html += f'''
+            <div class="application">
+                <h2>{c["first_name"]} {c["last_name"]} <span style="font-size:13px;color:{active_color};">({active_label})</span></h2>
+                <p><strong>Phone:</strong> {c["phone"] or "N/A"} &nbsp;|&nbsp;
+                   <strong>Email:</strong> {c["email"] or "N/A"}</p>
+                <p><strong>Address:</strong> {c["address"] or "Not provided"}</p>
+                <p class="form-note">Added: {str(c["created_date"])[:10]}</p>
+                <a class="btn" href="/customers/{c["id"]}/edit">Edit</a>
+            </div>
+            '''
+    return html
+
+
+@app.route('/customers/new', methods=['GET', 'POST'])
+@login_required
+def customers_new():
+    if request.method == 'POST':
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('''INSERT INTO customers
+                          (first_name, last_name, phone, email, address, active)
+                          VALUES (%s, %s, %s, %s, %s, %s)''',
+                       (request.form['first_name'], request.form['last_name'],
+                        request.form.get('phone', ''), request.form.get('email', ''),
+                        request.form.get('address', ''),
+                        1 if request.form.get('active') == 'on' else 0))
+        conn.commit()
+        conn.close()
+        return redirect('/customers')
+
+    return STYLE + admin_nav() + '''
+    <h1>Add New Customer</h1>
+    <form method="POST">
+        <label>First Name:</label>
+        <input type="text" name="first_name" required>
+        <label>Last Name:</label>
+        <input type="text" name="last_name" required>
+        <label>Phone:</label>
+        <input type="tel" name="phone">
+        <label>Email:</label>
+        <input type="email" name="email">
+        <label>Address:</label>
+        <input type="text" name="address" placeholder="Street, City, State">
+        <label><input type="checkbox" name="active" checked style="width:auto;display:inline-block;margin-right:6px;">Active customer</label>
+        <button class="btn btn-success" type="submit">Save Customer</button>
+        <a class="btn" href="/customers" style="background:#95a5a6;">Cancel</a>
+    </form>
+    '''
+
+
+@app.route('/customers/<int:customer_id>/edit', methods=['GET', 'POST'])
+@login_required
+def customers_edit(customer_id):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM customers WHERE id = %s', (customer_id,))
+    customer = cursor.fetchone()
+    if not customer:
+        conn.close()
+        return redirect('/customers')
+
+    if request.method == 'POST':
+        cursor.execute('''UPDATE customers SET first_name=%s, last_name=%s, phone=%s,
+                          email=%s, address=%s, active=%s WHERE id=%s''',
+                       (request.form['first_name'], request.form['last_name'],
+                        request.form.get('phone', ''), request.form.get('email', ''),
+                        request.form.get('address', ''),
+                        1 if request.form.get('active') == 'on' else 0, customer_id))
+        conn.commit()
+        conn.close()
+        return redirect('/customers')
+
+    conn.close()
+    checked = 'checked' if customer['active'] else ''
+    return STYLE + admin_nav() + f'''
+    <h1>Edit Customer: {customer["first_name"]} {customer["last_name"]}</h1>
+    <form method="POST">
+        <label>First Name:</label>
+        <input type="text" name="first_name" required value="{customer['first_name']}">
+        <label>Last Name:</label>
+        <input type="text" name="last_name" required value="{customer['last_name']}">
+        <label>Phone:</label>
+        <input type="tel" name="phone" value="{customer['phone'] or ''}">
+        <label>Email:</label>
+        <input type="email" name="email" value="{customer['email'] or ''}">
+        <label>Address:</label>
+        <input type="text" name="address" value="{customer['address'] or ''}">
+        <label><input type="checkbox" name="active" {checked} style="width:auto;display:inline-block;margin-right:6px;">Active customer</label>
+        <button class="btn btn-success" type="submit">Save Changes</button>
+        <a class="btn" href="/customers" style="background:#95a5a6;">Cancel</a>
+    </form>
+    '''
+
+
+JOB_STATUS_LABELS = {
+    'pending_confirmation': ('Pending Confirmation', '#9b59b6'),
+    'scheduled': ('Scheduled', '#3498db'),
+    'in_progress': ('In Progress', '#f39c12'),
+    'completed': ('Completed', '#27ae60'),
+    'rescheduled': ('Rescheduled', '#e67e22'),
+    'cancelled': ('Cancelled', '#c0392b'),
+}
+
+RECURRENCE_LABELS = {
+    'one_time': 'One-Time',
+    'weekly': 'Weekly',
+    'biweekly': 'Biweekly',
+    'monthly': 'Monthly',
+}
+
+def format_job_time(t):
+    """pymysql returns TIME columns as datetime.timedelta, not a clock time --
+    str(timedelta)[:5] breaks for any single-digit hour (e.g. 9:00 AM jobs)."""
+    if not t:
+        return ''
+    total_seconds = int(t.total_seconds())
+    hours = (total_seconds // 3600) % 24
+    minutes = (total_seconds % 3600) // 60
+    return f'{hours:02d}:{minutes:02d}'
+
+
+CREW_ROLES = ['floor', 'bathroom', 'duster']
+
+
+def job_status_badge(status):
+    label, color = JOB_STATUS_LABELS.get(status, ('Unknown', '#95a5a6'))
+    return f'<span style="background:{color};color:white;padding:3px 10px;border-radius:4px;font-size:12px;font-weight:bold;">{label}</span>'
+
+
+def get_crew_roster():
+    """Real crew roster -- people who've actually been hired and trained,
+    not candidates.status (which is set manually and not kept current)."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT candidates.id, candidates.first_name, candidates.last_name
+        FROM trainees
+        JOIN candidates ON trainees.candidate_id = candidates.id
+        ORDER BY candidates.first_name
+    ''')
+    roster = cursor.fetchall()
+    conn.close()
+    return roster
+
+
+def crew_options(roster, selected_id):
+    selected_id = str(selected_id) if selected_id else ''
+    opts = '<option value="">-- none --</option>'
+    for person in roster:
+        sel = 'selected' if str(person['id']) == selected_id else ''
+        opts += f'<option value="{person["id"]}" {sel}>{person["first_name"]} {person["last_name"]}</option>'
+    return opts
+
+
+def save_job_crew(cursor, job_id, form):
+    cursor.execute('DELETE FROM cleaning_job_crew WHERE cleaning_job_id=%s', (job_id,))
+    lead_role = form.get('lead_role', '')
+    for role in CREW_ROLES:
+        candidate_id = form.get(f'{role}_candidate_id', '')
+        if candidate_id:
+            is_lead = 1 if lead_role == role else 0
+            cursor.execute(
+                'INSERT INTO cleaning_job_crew (cleaning_job_id, candidate_id, role, is_lead) VALUES (%s, %s, %s, %s)',
+                (job_id, candidate_id, role, is_lead)
+            )
+
+
+def job_form_html(job, crew_by_role, lead_role, customers, roster, action_url, title, submit_label):
+    customer_options = '<option value="">-- Select customer --</option>'
+    for c in customers:
+        sel = 'selected' if job and str(job['customer_id']) == str(c['id']) else ''
+        customer_options += f'<option value="{c["id"]}" {sel}>{c["first_name"]} {c["last_name"]}</option>'
+
+    service_options = '<option value="">-- Select service --</option>'
+    for s in SERVICE_TYPES:
+        sel = 'selected' if job and job['service_type'] == s else ''
+        service_options += f'<option value="{s}" {sel}>{s}</option>'
+
+    status_options = ''
+    current_status = job['status'] if job else 'scheduled'
+    for val, (label, color) in JOB_STATUS_LABELS.items():
+        sel = 'selected' if current_status == val else ''
+        status_options += f'<option value="{val}" {sel}>{label}</option>'
+
+    recurrence_options = ''
+    current_recurrence = job['recurrence_rule'] if job and job['recurrence_rule'] else 'one_time'
+    for val, label in RECURRENCE_LABELS.items():
+        sel = 'selected' if current_recurrence == val else ''
+        recurrence_options += f'<option value="{val}" {sel}>{label}</option>'
+
+    crew_rows = ''
+    for role in CREW_ROLES:
+        opts = crew_options(roster, crew_by_role.get(role))
+        checked = 'checked' if lead_role == role else ''
+        crew_rows += f'''
+        <tr>
+            <td style="padding:6px 10px;text-transform:capitalize;">{role}</td>
+            <td style="padding:6px 10px;"><select name="{role}_candidate_id" style="margin:0;">{opts}</select></td>
+            <td style="padding:6px 10px;"><input type="radio" name="lead_role" value="{role}" {checked} style="width:auto;"> Lead</td>
+        </tr>
+        '''
+
+    scheduled_date = job['scheduled_date'] if job else ''
+    scheduled_time = format_job_time(job['scheduled_time']) if job else ''
+    price = job['price'] if job and job['price'] is not None else ''
+    notes = job['notes'] if job and job['notes'] else ''
+
+    return STYLE + admin_nav() + f'''
+    <h1>{title}</h1>
+    <form method="POST" action="{action_url}">
+        <label>Customer:</label>
+        <select name="customer_id" required>{customer_options}</select>
+        <label>Date:</label>
+        <input type="date" name="scheduled_date" required value="{scheduled_date}">
+        <label>Time:</label>
+        <input type="time" name="scheduled_time" value="{scheduled_time}">
+        <label>Service Type:</label>
+        <select name="service_type">{service_options}</select>
+        <label>Status:</label>
+        <select name="status">{status_options}</select>
+        <label>Recurrence:</label>
+        <select name="recurrence_rule">{recurrence_options}</select>
+        <label>Price (reference only -- estimates come from QuickBooks):</label>
+        <input type="number" name="price" step="0.01" value="{price}">
+        <label>Crew:</label>
+        <table style="margin-bottom:1rem;">{crew_rows}</table>
+        <label>Notes:</label>
+        <textarea name="notes" rows="3">{notes}</textarea>
+        <button class="btn btn-success" type="submit">{submit_label}</button>
+        <a class="btn" href="/schedule" style="background:#95a5a6;">Cancel</a>
+    </form>
+    '''
+
+
+@app.route('/schedule')
+@login_required
+def schedule_list():
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT cleaning_jobs.*, customers.first_name as cust_first, customers.last_name as cust_last
+        FROM cleaning_jobs
+        JOIN customers ON cleaning_jobs.customer_id = customers.id
+        ORDER BY cleaning_jobs.scheduled_date ASC, cleaning_jobs.scheduled_time ASC
+    ''')
+    jobs = cursor.fetchall()
+    cursor.execute('''
+        SELECT cleaning_job_crew.*, candidates.first_name, candidates.last_name
+        FROM cleaning_job_crew
+        JOIN candidates ON cleaning_job_crew.candidate_id = candidates.id
+    ''')
+    crew_rows = cursor.fetchall()
+    conn.close()
+
+    crew_by_job = {}
+    for row in crew_rows:
+        crew_by_job.setdefault(row['cleaning_job_id'], []).append(row)
+
+    html = STYLE + admin_nav() + '<h1>Scheduling</h1>'
+    html += '<p><a class="btn btn-success" href="/schedule/new">+ Schedule a Job</a></p>'
+
+    if not jobs:
+        html += '<div class="info"><p>No jobs scheduled yet. You\'ll need at least one customer first -- see <a href="/customers">Customers</a>.</p></div>'
+    else:
+        for job in jobs:
+            crew = crew_by_job.get(job['id'], [])
+            if crew:
+                parts = []
+                for c in crew:
+                    role_label = c['role'].title() if c['role'] else 'Crew'
+                    lead_tag = ' (Lead)' if c['is_lead'] else ''
+                    parts.append(f"{c['first_name']} {c['last_name']} - {role_label}{lead_tag}")
+                crew_html = '<p><strong>Crew:</strong> ' + ', '.join(parts) + '</p>'
+            else:
+                crew_html = '<p><strong>Crew:</strong> Not assigned yet</p>'
+
+            time_str = format_job_time(job['scheduled_time'])
+            html += f'''
+            <div class="application">
+                <h2>{job["cust_first"]} {job["cust_last"]} {job_status_badge(job["status"])}</h2>
+                <p><strong>Date:</strong> {job["scheduled_date"]} {time_str} &nbsp;|&nbsp;
+                   <strong>Service:</strong> {job["service_type"] or "Not specified"}</p>
+                {crew_html}
+                {f"<p><strong>Notes:</strong> {job['notes']}</p>" if job["notes"] else ""}
+                <a class="btn" href="/schedule/{job["id"]}/edit">Edit</a>
+                <form method="POST" action="/schedule/{job["id"]}/delete" onsubmit="return confirm('Delete this job?');"
+                      style="display:inline-block;margin-top:10px;box-shadow:none;padding:0;background:none;">
+                    <button class="btn btn-danger" type="submit">Delete</button>
+                </form>
+            </div>
+            '''
+    return html
+
+
+@app.route('/schedule/new', methods=['GET', 'POST'])
+@login_required
+def schedule_new():
+    conn = get_db()
+    cursor = conn.cursor()
+
+    if request.method == 'POST':
+        cursor.execute('''INSERT INTO cleaning_jobs
+            (customer_id, scheduled_date, scheduled_time, service_type, status, recurrence_rule, price, notes)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)''',
+            (request.form['customer_id'], request.form['scheduled_date'],
+             request.form.get('scheduled_time') or None, request.form.get('service_type', ''),
+             request.form.get('status', 'scheduled'), request.form.get('recurrence_rule', 'one_time'),
+             request.form.get('price') or None, request.form.get('notes', '')))
+        job_id = cursor.lastrowid
+        save_job_crew(cursor, job_id, request.form)
+        conn.commit()
+        conn.close()
+        return redirect('/schedule')
+
+    cursor.execute('SELECT * FROM customers WHERE active=1 ORDER BY first_name')
+    customers = cursor.fetchall()
+    conn.close()
+    roster = get_crew_roster()
+
+    return job_form_html(None, {}, '', customers, roster, '/schedule/new', 'Schedule a Job', 'Save Job')
+
+
+@app.route('/schedule/<int:job_id>/edit', methods=['GET', 'POST'])
+@login_required
+def schedule_edit(job_id):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM cleaning_jobs WHERE id = %s', (job_id,))
+    job = cursor.fetchone()
+    if not job:
+        conn.close()
+        return redirect('/schedule')
+
+    if request.method == 'POST':
+        cursor.execute('''UPDATE cleaning_jobs SET customer_id=%s, scheduled_date=%s, scheduled_time=%s,
+            service_type=%s, status=%s, recurrence_rule=%s, price=%s, notes=%s WHERE id=%s''',
+            (request.form['customer_id'], request.form['scheduled_date'],
+             request.form.get('scheduled_time') or None, request.form.get('service_type', ''),
+             request.form.get('status', 'scheduled'), request.form.get('recurrence_rule', 'one_time'),
+             request.form.get('price') or None, request.form.get('notes', ''), job_id))
+        save_job_crew(cursor, job_id, request.form)
+        conn.commit()
+        conn.close()
+        return redirect('/schedule')
+
+    cursor.execute('SELECT * FROM customers ORDER BY first_name')
+    customers = cursor.fetchall()
+    cursor.execute('SELECT * FROM cleaning_job_crew WHERE cleaning_job_id=%s', (job_id,))
+    crew_rows = cursor.fetchall()
+    conn.close()
+    roster = get_crew_roster()
+
+    crew_by_role = {row['role']: row['candidate_id'] for row in crew_rows}
+    lead_role = next((row['role'] for row in crew_rows if row['is_lead']), '')
+
+    return job_form_html(job, crew_by_role, lead_role, customers, roster,
+                          f'/schedule/{job_id}/edit', f'Edit Job: {job["scheduled_date"]}', 'Save Changes')
+
+
+@app.route('/schedule/<int:job_id>/delete', methods=['POST'])
+@login_required
+def schedule_delete(job_id):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM cleaning_job_crew WHERE cleaning_job_id=%s', (job_id,))
+    cursor.execute('DELETE FROM cleaning_jobs WHERE id=%s', (job_id,))
+    conn.commit()
+    conn.close()
+    return redirect('/schedule')
 
 
 # ── Document Library Routes ───────────────────────────────────────────────────
