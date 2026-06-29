@@ -843,6 +843,18 @@ def dashboard():
                 {schedule_section}
             </div>
 
+            <!-- Advertise -->
+            <div class="dash-card">
+                <h2>Advertise</h2>
+                <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;">
+                    <a class="btn" href="https://www.facebook.com/adsmanager/manage/campaigns" target="_blank" rel="noopener noreferrer" style="background:#1877F2;">Facebook</a>
+                    <a class="btn" href="https://www.instagram.com/" target="_blank" rel="noopener noreferrer" style="background:#C13584;">Instagram</a>
+                    <a class="btn" href="https://ads.tiktok.com/" target="_blank" rel="noopener noreferrer" style="background:#010101;">TikTok</a>
+                    <a class="btn" href="https://ads.snapchat.com/" target="_blank" rel="noopener noreferrer" style="background:#FFFC00;color:#111;">Snapchat</a>
+                    <a class="btn" href="https://www.craigslist.org/" target="_blank" rel="noopener noreferrer" style="background:#5C3D2E;">Craigslist</a>
+                </div>
+            </div>
+
         </div>
     </div>
     '''
