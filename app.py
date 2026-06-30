@@ -324,6 +324,7 @@ nav{background:#5C3D2E;padding:0 20px;height:56px;display:flex;align-items:cente
     <a href="/trainees">Trainees</a>
     <a href="/admin/documents">Documents</a>
     <a href="/schedule">Scheduling</a>
+    <a href="/compliance">Compliance</a>
     <a href="/logout">Logout</a>
   </div>
 </nav>
@@ -589,6 +590,25 @@ def dashboard():
     ''')
     job_count = cursor.fetchone()['cnt']
 
+    # Compliance items due within 30 days
+    try:
+        cursor.execute('''
+            SELECT COUNT(*) as cnt FROM compliance_items
+            WHERE due_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+              AND status != "completed"
+        ''')
+        compliance_due_count = cursor.fetchone()['cnt']
+        cursor.execute('''
+            SELECT * FROM compliance_items
+            WHERE due_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+              AND status != "completed"
+            ORDER BY due_date ASC LIMIT 5
+        ''')
+        compliance_due_items = cursor.fetchall()
+    except Exception:
+        compliance_due_count = 0
+        compliance_due_items = []
+
     conn.close()
 
     # Build application rows
@@ -668,6 +688,23 @@ def dashboard():
         schedule_section = '<table><tr><th>Customer</th><th>Date</th><th>Status</th><th></th></tr>' + job_rows + '</table>'
     else:
         schedule_section = '<p class="empty-msg">No upcoming jobs scheduled.</p>'
+
+    compliance_rows = ''
+    for _ci in compliance_due_items:
+        import datetime as _dt
+        _days = (_ci['due_date'] - _dt.date.today()).days
+        if _days < 0:
+            _color, _urg = '#c0392b', f'OVERDUE by {abs(_days)}d'
+        elif _days <= 7:
+            _color, _urg = '#e67e22', f'{_days}d left'
+        else:
+            _color, _urg = '#f39c12', f'{_days}d left'
+        _desc = _ci['description'][:40] + ('...' if len(_ci['description']) > 40 else '')
+        compliance_rows += f'<tr><td>{_ci["category"]}</td><td>{_desc}</td><td><span style="color:{_color};font-weight:bold;">{_urg}</span></td><td><a class="btn btn-sm" href="/compliance/{_ci["id"]}/edit">Update</a></td></tr>'
+    if compliance_due_items:
+        compliance_section = f'<table><tr><th>Category</th><th>Item</th><th>Due</th><th></th></tr>{compliance_rows}</table>'
+    else:
+        compliance_section = '<p class="empty-msg" style="color:#27ae60;">&#10003; All compliance items are current.</p>'
 
     html = STYLE + admin_nav() + f'''
     <style>
@@ -810,9 +847,14 @@ def dashboard():
                 <div class="stat-label">Upcoming Jobs</div>
             </a>
             <a class="dash-stat" href="https://qbo.intuit.com/" target="_blank" rel="noopener noreferrer">
-                <div class="stat-icon">💰</div>
+                <div class="stat-icon">&#128176;</div>
                 <div class="stat-number" style="font-size:1.7rem;">QuickBooks</div>
                 <div class="stat-label">Sign in to manage billing</div>
+            </a>
+            <a class="dash-stat" href="/compliance" style="border-left-color:{'#c0392b' if compliance_due_count > 0 else '#27ae60'};">
+                <div class="stat-icon">{'&#9888;&#65039;' if compliance_due_count > 0 else '&#9989;'}</div>
+                <div class="stat-number">{compliance_due_count}</div>
+                <div class="stat-label">Compliance Due Soon</div>
             </a>
         </div>
 
@@ -841,6 +883,12 @@ def dashboard():
             <div class="dash-card">
                 <h2>Upcoming Schedule <a href="/schedule">View All →</a></h2>
                 {schedule_section}
+            </div>
+
+            <!-- Compliance -->
+            <div class="dash-card">
+                <h2>Compliance <a href="/compliance">View All &#8594;</a></h2>
+                {compliance_section}
             </div>
 
             <!-- Advertise -->
@@ -2889,6 +2937,179 @@ def schedule_delete(job_id):
     conn.commit()
     conn.close()
     return redirect('/schedule')
+
+
+COMPLIANCE_CATEGORIES = ['Insurance', 'Tax Filing', 'License', 'Registration', 'Payroll', 'Other']
+COMPLIANCE_RECURRENCE = {'one_time': 'One-Time', 'monthly': 'Monthly', 'quarterly': 'Quarterly', 'annual': 'Annual'}
+COMPLIANCE_STATUS = {
+    'current':   ('Current',   '#27ae60'),
+    'due_soon':  ('Due Soon',  '#f39c12'),
+    'overdue':   ('Overdue',   '#c0392b'),
+    'completed': ('Completed', '#3498db'),
+}
+MARKETS = ['Las Vegas', 'Salt Lake City', 'Both']
+
+
+def compliance_status_badge(status, due_date=None):
+    import datetime as _dt
+    if due_date and status != 'completed':
+        days = (due_date - _dt.date.today()).days
+        if days < 0:
+            status = 'overdue'
+        elif days <= 30:
+            status = 'due_soon'
+        else:
+            status = 'current'
+    label, color = COMPLIANCE_STATUS.get(status, ('Unknown', '#95a5a6'))
+    return f'<span style="background:{color};color:white;padding:3px 10px;border-radius:4px;font-size:12px;font-weight:bold;">{label}</span>'
+
+
+def advance_compliance_date(due_date, recurrence):
+    import calendar as _cal
+    import datetime as _dt
+    if recurrence == 'monthly':
+        m, y = due_date.month + 1, due_date.year
+        if m > 12: m, y = 1, y + 1
+        return due_date.replace(year=y, month=m, day=min(due_date.day, _cal.monthrange(y, m)[1]))
+    elif recurrence == 'quarterly':
+        m, y = due_date.month + 3, due_date.year
+        while m > 12: m, y = m - 12, y + 1
+        return due_date.replace(year=y, month=m, day=min(due_date.day, _cal.monthrange(y, m)[1]))
+    elif recurrence == 'annual':
+        try:
+            return due_date.replace(year=due_date.year + 1)
+        except ValueError:
+            return due_date.replace(year=due_date.year + 1, day=28)
+    return None
+
+
+@app.route('/compliance')
+@login_required
+def compliance_list():
+    import datetime as _dt
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM compliance_items ORDER BY due_date ASC')
+    items = cursor.fetchall()
+    conn.close()
+    today = _dt.date.today()
+    html = STYLE + admin_nav() + """<style>
+    .comp-table{width:100%;border-collapse:collapse;margin-top:1rem;}
+    .comp-table th{background:#5C3D2E;color:#FFF9F0;padding:10px 14px;text-align:left;font-size:13px;}
+    .comp-table td{padding:10px 14px;border-bottom:1px solid #eee;font-size:14px;vertical-align:middle;}
+    .comp-table tr:hover td{background:#fdf6ec;}
+    </style>"""
+    html += '<h1>Compliance</h1><p><a class="btn btn-success" href="/compliance/new">+ Add Item</a></p>'
+    if not items:
+        html += '<div class="info"><p>No compliance items yet.</p></div>'
+    else:
+        html += '<table class="comp-table"><tr><th>Category</th><th>Description</th><th>Market</th><th>Due Date</th><th>Recurrence</th><th>Status</th><th>Notes</th><th></th></tr>'
+        for item in items:
+            days = (item['due_date'] - today).days
+            badge = compliance_status_badge(item['status'], item['due_date'])
+            days_str = f'({abs(days)}d overdue)' if days < 0 else f'({days}d)' if days <= 30 else ''
+            rec_label = COMPLIANCE_RECURRENCE.get(item['recurrence'], item['recurrence'])
+            notes_short = (item['notes'] or '')[:50]
+            html += f'''<tr>
+                <td>{item["category"]}</td>
+                <td><strong>{item["description"]}</strong></td>
+                <td>{item["market"]}</td>
+                <td>{item["due_date"]} <span style="font-size:12px;color:#888;">{days_str}</span></td>
+                <td>{rec_label}</td>
+                <td>{badge}</td>
+                <td style="font-size:12px;color:#666;">{notes_short}</td>
+                <td><a class="btn" href="/compliance/{item["id"]}/edit">Edit</a></td>
+            </tr>'''
+        html += '</table>'
+    return html
+
+
+@app.route('/compliance/new', methods=['GET', 'POST'])
+@login_required
+def compliance_new():
+    if request.method == 'POST':
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('''INSERT INTO compliance_items
+            (category, description, market, due_date, recurrence, status, notes)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)''',
+            (request.form['category'], request.form['description'],
+             request.form.get('market', 'Las Vegas'), request.form['due_date'],
+             request.form.get('recurrence', 'one_time'), 'current',
+             request.form.get('notes', '')))
+        conn.commit()
+        conn.close()
+        return redirect('/compliance')
+    cat_opts = ''.join(f'<option value="{c}">{c}</option>' for c in COMPLIANCE_CATEGORIES)
+    rec_opts = ''.join(f'<option value="{v}">{l}</option>' for v, l in COMPLIANCE_RECURRENCE.items())
+    mkt_opts = ''.join(f'<option value="{m}">{m}</option>' for m in MARKETS)
+    return STYLE + admin_nav() + f'''
+    <h1>Add Compliance Item</h1>
+    <form method="POST">
+        <label>Category:</label><select name="category">{cat_opts}</select>
+        <label>Description:</label>
+        <input type="text" name="description" required placeholder="e.g. Workers Comp Insurance monthly payment">
+        <label>Market:</label><select name="market">{mkt_opts}</select>
+        <label>Due Date:</label><input type="date" name="due_date" required>
+        <label>Recurrence:</label><select name="recurrence">{rec_opts}</select>
+        <label>Notes (carrier, policy number, contact, etc.):</label>
+        <textarea name="notes" rows="3"></textarea>
+        <button class="btn btn-success" type="submit">Save Item</button>
+        <a class="btn" href="/compliance" style="background:#95a5a6;">Cancel</a>
+    </form>'''
+
+
+@app.route('/compliance/<int:item_id>/edit', methods=['GET', 'POST'])
+@login_required
+def compliance_edit(item_id):
+    import datetime as _dt
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM compliance_items WHERE id=%s', (item_id,))
+    item = cursor.fetchone()
+    if not item:
+        conn.close()
+        return redirect('/compliance')
+    if request.method == 'POST':
+        action = request.form.get('action', 'save')
+        new_due = request.form['due_date']
+        recurrence = request.form.get('recurrence', 'one_time')
+        if action == 'complete' and recurrence != 'one_time':
+            base = _dt.datetime.strptime(new_due, '%Y-%m-%d').date()
+            nxt = advance_compliance_date(base, recurrence)
+            if nxt:
+                new_due = nxt.strftime('%Y-%m-%d')
+        cursor.execute('''UPDATE compliance_items SET category=%s, description=%s, market=%s,
+            due_date=%s, recurrence=%s, status=%s, notes=%s WHERE id=%s''',
+            (request.form['category'], request.form['description'],
+             request.form.get('market', 'Las Vegas'), new_due,
+             recurrence, 'current', request.form.get('notes', ''), item_id))
+        conn.commit()
+        conn.close()
+        return redirect('/compliance')
+    conn.close()
+    cat_opts = ''.join(f'<option value="{c}" {"selected" if c == item["category"] else ""}>{c}</option>' for c in COMPLIANCE_CATEGORIES)
+    rec_opts = ''.join(f'<option value="{v}" {"selected" if v == item["recurrence"] else ""}>{l}</option>' for v, l in COMPLIANCE_RECURRENCE.items())
+    mkt_opts = ''.join(f'<option value="{m}" {"selected" if m == item["market"] else ""}>{m}</option>' for m in MARKETS)
+    return STYLE + admin_nav() + f'''
+    <h1>Edit: {item["description"]}</h1>
+    <form method="POST">
+        <label>Category:</label><select name="category">{cat_opts}</select>
+        <label>Description:</label>
+        <input type="text" name="description" required value="{item["description"]}">
+        <label>Market:</label><select name="market">{mkt_opts}</select>
+        <label>Due Date:</label><input type="date" name="due_date" required value="{item["due_date"]}">
+        <label>Recurrence:</label><select name="recurrence">{rec_opts}</select>
+        <label>Notes:</label>
+        <textarea name="notes" rows="3">{item["notes"] or ""}</textarea>
+        <button class="btn btn-success" type="submit" name="action" value="save">Save Changes</button>
+        <button class="btn" type="submit" name="action" value="complete"
+            style="background:#27ae60;"
+            onclick="return confirm('Mark as filed/paid and advance to next due date?')">
+            &#10003; Mark Filed / Paid
+        </button>
+        <a class="btn" href="/compliance" style="background:#95a5a6;">Cancel</a>
+    </form>'''
 
 
 # ── Document Library Routes ───────────────────────────────────────────────────
