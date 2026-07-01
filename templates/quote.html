@@ -539,7 +539,7 @@
         <strong>Standard Clean</strong> · 3 bed / 2 bath · Estimated <strong id="summaryAmt">$215</strong>
       </div>
 
-      <form method="POST" action="/quote" id="quoteForm">
+      <form method="POST" action="/quote" id="quoteForm" enctype="multipart/form-data">
         <!-- Hidden fields for calculator data -->
         <input type="hidden" name="cleaning_type" id="h_type" value="standard">
         <input type="hidden" name="bedrooms" id="h_beds" value="3">
@@ -575,7 +575,15 @@
         </div>
 
         <div class="submit-row" style="margin-top:20px;">
-          <button type="submit" class="btn-submit">Request My Quote →</button>
+          <div style="margin:1.5rem 0;">
+    <label style="font-weight:600;display:block;margin-bottom:0.5rem;">
+        Photos <span style="font-weight:400;color:#888;">(optional — attach up to 3 photos to help us give you a more accurate quote)</span>
+    </label>
+    <input type="file" name="photo_1" accept="image/*" style="display:block;margin-bottom:8px;">
+    <input type="file" name="photo_2" accept="image/*" style="display:block;margin-bottom:8px;">
+    <input type="file" name="photo_3" accept="image/*" style="display:block;margin-bottom:8px;">
+</div>
+<button type="submit" class="btn-submit">Request My Quote →</button>
           <div class="submit-note">We'll call or text within 24 hours.<br>No obligation to book.</div>
         </div>
       </form>

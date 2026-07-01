@@ -2475,11 +2475,26 @@ def quote_request():
         bathrooms     = request.form.get('bathrooms', '2')
         estimate      = request.form.get('estimate', '0')
 
+        photo_urls = []
+        for i in range(1, 4):
+            pf = request.files.get(f'photo_{i}')
+            if pf and pf.filename:
+                try:
+                    res = cloudinary.uploader.upload(pf, resource_type='image',
+                                                      folder='imhotep_quote_photos',
+                                                      use_filename=True, unique_filename=True,
+                                                      access_mode='public', type='upload')
+                    photo_urls.append(res.get('secure_url', ''))
+                except Exception:
+                    pass
+
         full_notes = f"[Quote] Type: {cleaning_type.upper()} | Beds: {bedrooms} | Baths: {bathrooms} | Estimate: ${estimate}"
         if notes:
             full_notes += f" | Notes: {notes}"
         if address:
             full_notes += f" | Address: {address}"
+        if photo_urls:
+            full_notes += " | Photos: " + ", ".join(photo_urls)
 
         conn = get_db()
         cursor = conn.cursor()
@@ -2840,6 +2855,7 @@ def schedule_list():
                 {crew_html}
                 {f"<p><strong>Notes:</strong> {job['notes']}</p>" if job["notes"] else ""}
                 <a class="btn" href="/schedule/{job["id"]}/edit">Edit</a>
+                <a class="btn" href="/schedule/{job["id"]}/photos" style="background:#8e44ad;">Photos</a>
                 <form method="POST" action="/schedule/{job["id"]}/delete" onsubmit="return confirm('Delete this job?');"
                       style="display:inline-block;margin-top:10px;box-shadow:none;padding:0;background:none;">
                     <button class="btn btn-danger" type="submit">Delete</button>
@@ -2925,6 +2941,96 @@ def schedule_edit(job_id):
 
     return job_form_html(job, crew_by_role, lead_role, customers, roster,
                           f'/schedule/{job_id}/edit', f'Edit Job: {job["scheduled_date"]}', 'Save Changes')
+
+
+@app.route('/schedule/<int:job_id>/photos', methods=['GET'])
+@login_required
+def job_photos_view(job_id):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM cleaning_jobs WHERE id=%s', (job_id,))
+    job = cursor.fetchone()
+    if not job:
+        conn.close()
+        return redirect('/schedule')
+    cursor.execute('''SELECT * FROM job_photos WHERE cleaning_job_id=%s ORDER BY uploaded_date DESC''', (job_id,))
+    photos = cursor.fetchall()
+    conn.close()
+
+    photo_html = ''
+    for p in photos:
+        label_color = '#3498db' if p['photo_type'] == 'before' else '#27ae60'
+        label = 'Before' if p['photo_type'] == 'before' else 'After'
+        photo_html += f'''
+        <div style="display:inline-block;margin:8px;text-align:center;vertical-align:top;">
+            <a href="{p["cloudinary_url"]}" target="_blank">
+                <img src="{p["cloudinary_url"]}" style="width:180px;height:140px;object-fit:cover;border-radius:8px;border:2px solid {label_color};">
+            </a>
+            <div style="margin-top:4px;">
+                <span style="background:{label_color};color:white;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:bold;">{label}</span>
+                <form method="POST" action="/schedule/{job_id}/photos/{p["id"]}/delete"
+                      style="display:inline;background:none;box-shadow:none;padding:0;"
+                      onsubmit="return confirm('Delete this photo?');">
+                    <button type="submit" style="background:none;border:none;color:#c0392b;cursor:pointer;font-size:12px;margin-left:4px;">✕</button>
+                </form>
+            </div>
+        </div>'''
+
+    return STYLE + admin_nav() + f'''
+    <h1>Job Photos: {job["scheduled_date"]}</h1>
+    <p><a class="btn" href="/schedule/{job_id}/edit">← Back to Job</a></p>
+    <h2 style="font-size:1.1rem;margin-top:1.5rem;">Upload New Photo</h2>
+    <form method="POST" action="/schedule/{job_id}/photos" enctype="multipart/form-data">
+        <label>Photo Type:</label>
+        <select name="photo_type">
+            <option value="before">Before</option>
+            <option value="after">After</option>
+        </select>
+        <label>Photo:</label>
+        <input type="file" name="photo" accept="image/*" required>
+        <button class="btn btn-success" type="submit">Upload Photo</button>
+    </form>
+    <h2 style="font-size:1.1rem;margin-top:2rem;">Photos ({len(photos)})</h2>
+    {photo_html if photos else "<p style='color:#888;'>No photos yet for this job.</p>"}
+    '''
+
+
+@app.route('/schedule/<int:job_id>/photos', methods=['POST'])
+@login_required
+def job_photos_upload(job_id):
+    photo_file = request.files.get('photo')
+    photo_type = request.form.get('photo_type', 'before')
+    if photo_file and photo_file.filename:
+        upload_result = cloudinary.uploader.upload(
+            photo_file,
+            resource_type='image',
+            folder='imhotep_job_photos',
+            use_filename=True,
+            unique_filename=True,
+            access_mode='public',
+            type='upload'
+        )
+        photo_url = upload_result.get('secure_url', '')
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(
+            'INSERT INTO job_photos (cleaning_job_id, cloudinary_url, photo_type) VALUES (%s, %s, %s)',
+            (job_id, photo_url, photo_type)
+        )
+        conn.commit()
+        conn.close()
+    return redirect(f'/schedule/{job_id}/photos')
+
+
+@app.route('/schedule/<int:job_id>/photos/<int:photo_id>/delete', methods=['POST'])
+@login_required
+def job_photos_delete(job_id, photo_id):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM job_photos WHERE id=%s AND cleaning_job_id=%s', (photo_id, job_id))
+    conn.commit()
+    conn.close()
+    return redirect(f'/schedule/{job_id}/photos')
 
 
 @app.route('/schedule/<int:job_id>/delete', methods=['POST'])
