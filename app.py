@@ -2392,6 +2392,31 @@ def crm_list():
         html += '<div class="info"><p>No leads yet. Add one manually or share your quote request link with customers: <strong>/quote</strong></p></div>'
     else:
         for lead in leads:
+            # Extract photo URLs from notes (format: "... | Photos: url1, url2")
+            notes_raw = lead['notes'] or ''
+            photo_urls = []
+            notes_clean = notes_raw
+            if '| Photos:' in notes_raw:
+                parts = notes_raw.split('| Photos:', 1)
+                notes_clean = parts[0].strip().rstrip('|').strip()
+                photo_urls = [u.strip() for u in parts[1].strip().split(',') if u.strip()]
+
+            photo_html = ''
+            if photo_urls:
+                photo_html = '<div style="margin:8px 0;">'
+                photo_html += '<p style="margin:0 0 6px 0;font-size:13px;font-weight:600;">Quote Photos:</p>'
+                for url in photo_urls:
+                    photo_html += (
+                        f'<a href="{url}" target="_blank" rel="noopener">'
+                        f'<img src="{url}" style="width:120px;height:90px;object-fit:cover;'
+                        f'border-radius:6px;border:2px solid #D4A843;margin-right:8px;'
+                        f'margin-bottom:4px;cursor:pointer;" title="Click to view full size">'
+                        f'</a>'
+                    )
+                photo_html += '</div>'
+
+            notes_html = f'<p><strong>Notes:</strong> {notes_clean}</p>' if notes_clean else ''
+
             html += f'''
             <div class="application">
                 <h2>{lead["first_name"]} {lead["last_name"]} {status_badge(lead["status"])}</h2>
@@ -2399,7 +2424,8 @@ def crm_list():
                    <strong>Phone:</strong> {lead["phone"] or "N/A"} &nbsp;|&nbsp;
                    <strong>Email:</strong> {lead["email"] or "N/A"}</p>
                 <p><strong>Address:</strong> {lead["address"] or "Not provided"}</p>
-                {f"<p><strong>Notes:</strong> {lead['notes']}</p>" if lead["notes"] else ""}
+                {notes_html}
+                {photo_html}
                 <p class="form-note">Added: {str(lead["created_date"])[:10]}</p>
                 <a class="btn" href="/crm/{lead["id"]}/edit">Edit / Update</a>
                 <form method="POST" action="/crm/{lead["id"]}/delete" onsubmit="return confirm('Delete this lead?');"
