@@ -317,6 +317,7 @@ nav{background:#5C3D2E;padding:0 20px;height:56px;display:flex;align-items:cente
   <div class="navbar-links">
     <a href="/dashboard">Dashboard</a>
     <a href="/applications">Applications</a>
+    <a href="/staff">Staff</a>
     <a href="/crm">CRM</a>
     <a href="/customers">Customers</a>
     <a href="/post-job">Post a Job</a>
@@ -909,6 +910,96 @@ def dashboard():
     </div>
     '''
     return html
+
+@app.route('/staff')
+@login_required
+def staff_list():
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT candidates.*,
+               trainees.id as trainee_id,
+               trainees.hired_date,
+               trainees.access_code
+        FROM candidates
+        LEFT JOIN trainees ON trainees.candidate_id = candidates.id
+        WHERE candidates.status IN ('Active', 'Scheduling')
+        ORDER BY candidates.first_name ASC
+    ''')
+    staff = cursor.fetchall()
+
+    # Get certification status for each trainee
+    cursor.execute('''
+        SELECT training_modules.required, module_progress.trainee_id, module_progress.passed
+        FROM training_modules
+        LEFT JOIN module_progress ON module_progress.module_id = training_modules.id
+    ''')
+    progress_rows = cursor.fetchall()
+    conn.close()
+
+    # Build cert map: trainee_id -> certified bool
+    from collections import defaultdict
+    required_total = sum(1 for r in progress_rows if r['required'])
+    passed_by_trainee = defaultdict(int)
+    for r in progress_rows:
+        if r['required'] and r['passed'] and r['trainee_id']:
+            passed_by_trainee[r['trainee_id']] += 1
+
+    html = STYLE + admin_nav()
+    html += '<h1>Staff</h1>'
+    html += '<p class="form-note">Showing Active and Scheduling crew members only. '
+    html += '<a href="/applications">View all applicants &rarr;</a></p>'
+
+    if not staff:
+        html += '<div class="info"><p>No active staff yet. Hire someone from <a href="/applications">Applications</a> and move them to Active status.</p></div>'
+        return html
+
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem;margin-top:1rem;">'
+    for s in staff:
+        name = s['first_name'] + ' ' + s['last_name']
+        status = s['status'] or 'Active'
+        status_color = '#27ae60' if status == 'Active' else '#3498db'
+        phone = s['phone'] or 'No phone'
+        email = s['email'] or 'No email'
+        hired = str(s['hired_date'])[:10] if s.get('hired_date') else 'Unknown'
+
+        # Certification badge
+        if s['trainee_id']:
+            passed = passed_by_trainee.get(s['trainee_id'], 0)
+            if required_total > 0 and passed >= required_total:
+                cert_badge = '<span style="background:#27ae60;color:white;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:bold;">CERTIFIED</span>'
+            else:
+                cert_badge = f'<span style="background:#f39c12;color:white;padding:2px 8px;border-radius:4px;font-size:11px;">{passed}/{required_total} modules</span>'
+            trainee_link = f'<a class="btn" href="/trainee/{s["trainee_id"]}" style="font-size:12px;padding:4px 10px;">Training Record</a>'
+        else:
+            cert_badge = '<span style="background:#95a5a6;color:white;padding:2px 8px;border-radius:4px;font-size:11px;">No training record</span>'
+            trainee_link = ''
+
+        html += f'''
+        <div class="application" style="margin:0;">
+            <h2 style="margin-bottom:6px;">{name}</h2>
+            <p style="margin:4px 0;">
+                <span style="background:{status_color};color:white;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:bold;">{status}</span>
+                &nbsp;{cert_badge}
+            </p>
+            <p style="margin:8px 0 4px 0;font-size:13px;">
+                <strong>Phone:</strong> {phone}
+            </p>
+            <p style="margin:4px 0;font-size:13px;">
+                <strong>Email:</strong> {email}
+            </p>
+            <p style="margin:4px 0;font-size:13px;color:#888;">
+                Hired: {hired}
+            </p>
+            <div style="margin-top:10px;">
+                {trainee_link}
+                <a class="btn" href="/applications" style="font-size:12px;padding:4px 10px;background:#95a5a6;">Update Status</a>
+            </div>
+        </div>
+        '''
+    html += '</div>'
+    return html
+
 
 @app.route('/applications')
 @login_required
