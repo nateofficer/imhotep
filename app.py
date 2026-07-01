@@ -324,6 +324,7 @@ nav{background:#5C3D2E;padding:0 20px;height:56px;display:flex;align-items:cente
     <a href="/trainees">Trainees</a>
     <a href="/admin/documents">Documents</a>
     <a href="/schedule">Scheduling</a>
+    <a href="/schedule/calendar">Calendar</a>
     <a href="/compliance">Compliance</a>
     <a href="/logout">Logout</a>
   </div>
@@ -337,6 +338,7 @@ def trainee_nav():
     <div class="nav">
         <a href="/training">My Training</a>
         <a href="/trainee/documents">My Documents</a>
+        <a href="/timeclock">&#9200; Time Clock</a>
         <a href="/trainee-logout">Logout</a>
         <span class="trainee-badge">TRAINEE</span>
     </div>
@@ -2829,7 +2831,7 @@ def schedule_list():
         crew_by_job.setdefault(row['cleaning_job_id'], []).append(row)
 
     html = STYLE + admin_nav() + '<h1>Scheduling</h1>'
-    html += '<p><a class="btn btn-success" href="/schedule/new">+ Schedule a Job</a></p>'
+    html += '<p><a class="btn btn-success" href="/schedule/new">+ Schedule a Job</a> <a class="btn" href="/schedule/calendar" style="background:#8e44ad;">&#128197; Calendar</a> <a class="btn" href="/schedule/timesheets" style="background:#5C3D2E;">Timesheets</a></p>'
 
     if not jobs:
         html += '<div class="info"><p>No jobs scheduled yet. You\'ll need at least one customer first -- see <a href="/customers">Customers</a>.</p></div>'
@@ -3044,6 +3046,339 @@ def schedule_delete(job_id):
     conn.close()
     return redirect('/schedule')
 
+
+JOB_STATUS_COLORS = {
+    'scheduled':            '#3498db',
+    'in_progress':          '#f39c12',
+    'completed':            '#27ae60',
+    'rescheduled':          '#95a5a6',
+    'cancelled':            '#c0392b',
+    'pending_confirmation': '#9b59b6',
+}
+
+
+
+@app.route('/schedule/calendar')
+@login_required
+def schedule_calendar():
+    import datetime as _dt
+    import calendar as _cal
+    view = request.args.get('view', 'month')
+    today = _dt.date.today()
+    year  = int(request.args.get('year',  today.year))
+    month = int(request.args.get('month', today.month))
+    week_start_str = request.args.get('week_start', '')
+    if week_start_str:
+        week_start = _dt.date.fromisoformat(week_start_str)
+    else:
+        week_start = today - _dt.timedelta(days=today.weekday())
+    conn = get_db()
+    cursor = conn.cursor()
+    if view == 'month':
+        first_day = _dt.date(year, month, 1)
+        last_day  = _dt.date(year, month, _cal.monthrange(year, month)[1])
+        cursor.execute(
+            "SELECT cleaning_jobs.*, customers.first_name as cust_first, customers.last_name as cust_last"
+            " FROM cleaning_jobs JOIN customers ON cleaning_jobs.customer_id = customers.id"
+            " WHERE cleaning_jobs.scheduled_date BETWEEN %s AND %s"
+            " AND cleaning_jobs.status != 'pending_confirmation'"
+            " ORDER BY cleaning_jobs.scheduled_date, cleaning_jobs.scheduled_time",
+            (first_day, last_day))
+    else:
+        week_end = week_start + _dt.timedelta(days=6)
+        cursor.execute(
+            "SELECT cleaning_jobs.*, customers.first_name as cust_first, customers.last_name as cust_last"
+            " FROM cleaning_jobs JOIN customers ON cleaning_jobs.customer_id = customers.id"
+            " WHERE cleaning_jobs.scheduled_date BETWEEN %s AND %s"
+            " AND cleaning_jobs.status != 'pending_confirmation'"
+            " ORDER BY cleaning_jobs.scheduled_date, cleaning_jobs.scheduled_time",
+            (week_start, week_end))
+    jobs = cursor.fetchall()
+    conn.close()
+    jobs_by_date = {}
+    for j in jobs:
+        d = str(j['scheduled_date'])
+        jobs_by_date.setdefault(d, []).append(j)
+    if view == 'month':
+        prev_m = month - 1 if month > 1 else 12
+        prev_y = year if month > 1 else year - 1
+        next_m = month + 1 if month < 12 else 1
+        next_y = year if month < 12 else year + 1
+        prev_url = "/schedule/calendar?view=month&year=" + str(prev_y) + "&month=" + str(prev_m)
+        next_url = "/schedule/calendar?view=month&year=" + str(next_y) + "&month=" + str(next_m)
+        title = _cal.month_name[month] + " " + str(year)
+    else:
+        prev_ws = (week_start - _dt.timedelta(days=7)).isoformat()
+        next_ws = (week_start + _dt.timedelta(days=7)).isoformat()
+        prev_url = "/schedule/calendar?view=week&week_start=" + prev_ws
+        next_url = "/schedule/calendar?view=week&week_start=" + next_ws
+        title = "Week of " + week_start.strftime("%b %d, %Y")
+    month_url = "/schedule/calendar?view=month&year=" + str(year) + "&month=" + str(month)
+    week_url  = "/schedule/calendar?view=week&week_start=" + week_start.isoformat()
+    month_active = "active" if view == "month" else ""
+    week_active  = "active" if view == "week"  else ""
+    html = STYLE + admin_nav()
+    html += "<style>.cal-nav{display:flex;gap:8px;align-items:center;margin-bottom:1rem;}"
+    html += ".cal-nav a{padding:6px 14px;background:#5C3D2E;color:#FFF9F0;border-radius:6px;text-decoration:none;font-size:13px;font-weight:700;}"
+    html += ".view-toggle{display:flex;gap:6px;}"
+    html += ".view-toggle a{padding:6px 14px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:700;border:2px solid #5C3D2E;color:#5C3D2E;}"
+    html += ".view-toggle a.active{background:#5C3D2E;color:#FFF9F0;}"
+    html += ".month-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:#ddd;border-radius:8px;overflow:hidden;}"
+    html += ".month-day-header{background:#5C3D2E;color:#FFF9F0;text-align:center;padding:8px;font-size:12px;font-weight:700;}"
+    html += ".month-day{background:#fff;min-height:90px;padding:4px;}"
+    html += ".month-day.today-cell{background:#fdf6ec;}"
+    html += ".day-num{font-size:12px;font-weight:700;color:#5C3D2E;margin-bottom:4px;}"
+    html += ".cal-job{font-size:11px;padding:2px 5px;border-radius:3px;margin-bottom:2px;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;text-decoration:none;}"
+    html += ".week-grid{display:grid;grid-template-columns:60px repeat(7,1fr);gap:1px;background:#ddd;border-radius:8px;overflow:hidden;}"
+    html += ".week-day-header{background:#5C3D2E;color:#FFF9F0;text-align:center;padding:10px 4px;font-size:12px;font-weight:700;}"
+    html += ".week-time{background:#f5f5f5;text-align:right;padding:4px 6px;font-size:10px;color:#888;}"
+    html += ".week-cell{background:#fff;min-height:50px;padding:2px;}"
+    html += ".week-cell.today-cell{background:#fdf6ec;}</style>"
+    html += "<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;'>"
+    html += "<h1 style='margin:0;'>Calendar</h1>"
+    html += "<div class='view-toggle'>"
+    html += "<a href='" + month_url + "' class='" + month_active + "'>Month</a>"
+    html += "<a href='" + week_url  + "' class='" + week_active  + "'>Week</a>"
+    html += "</div></div>"
+    html += "<div class='cal-nav'>"
+    html += "<a href='" + prev_url + "'>&larr; Prev</a>"
+    html += "<strong style='font-size:1.1rem;'>" + title + "</strong>"
+    html += "<a href='" + next_url + "'>Next &rarr;</a>"
+    html += "<a href='/schedule/new' style='margin-left:12px;background:#27ae60;'>+ New Job</a>"
+    html += "</div>"
+    if view == 'month':
+        html += "<div class='month-grid'>"
+        for dn in ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']:
+            html += "<div class='month-day-header'>" + dn + "</div>"
+        first_weekday = _dt.date(year, month, 1).weekday()
+        for _ in range(first_weekday):
+            html += "<div class='month-day' style='background:#f9f9f9;'></div>"
+        num_days = _cal.monthrange(year, month)[1]
+        for day in range(1, num_days + 1):
+            d = _dt.date(year, month, day)
+            extra = " today-cell" if d == today else ""
+            html += "<div class='month-day" + extra + "'><div class='day-num'>" + str(day) + "</div>"
+            for j in jobs_by_date.get(str(d), []):
+                color = JOB_STATUS_COLORS.get(j["status"], "#95a5a6")
+                t = format_job_time(j["scheduled_time"]) if j["scheduled_time"] else ""
+                label = (t + " " if t else "") + j["cust_first"] + " " + j["cust_last"]
+                html += "<a class='cal-job' href='/schedule/" + str(j["id"]) + "/edit' style='background:" + color + ";' title='" + label + "'>" + label + "</a>"
+            html += "</div>"
+        remainder = (7 - (first_weekday + num_days) % 7) % 7
+        for _ in range(remainder):
+            html += "<div class='month-day' style='background:#f9f9f9;'></div>"
+        html += "</div>"
+    else:
+        days = [week_start + _dt.timedelta(days=i) for i in range(7)]
+        html += "<div class='week-grid'>"
+        html += "<div class='week-day-header'></div>"
+        for d in days:
+            bg = "background:#D4A843;color:#fff;" if d == today else ""
+            html += "<div class='week-day-header' style='" + bg + "'>" + d.strftime("%a") + "<br><span style='font-size:14px;'>" + str(d.day) + "</span></div>"
+        for hour in range(7, 21):
+            label = ("12" if hour == 12 else str(hour % 12)) + ("am" if hour < 12 else "pm")
+            html += "<div class='week-time'>" + label + "</div>"
+            for d in days:
+                extra = " today-cell" if d == today else ""
+                html += "<div class='week-cell" + extra + "'>"
+                for j in jobs_by_date.get(str(d), []):
+                    jt = j["scheduled_time"]
+                    show = False
+                    if jt:
+                        job_hour = (int(jt.total_seconds()) // 3600) % 24
+                        show = (job_hour == hour)
+                    elif hour == 8:
+                        show = True
+                    if show:
+                        color = JOB_STATUS_COLORS.get(j["status"], "#95a5a6")
+                        lbl = j["cust_first"] + " " + j["cust_last"]
+                        html += "<a class='cal-job' href='/schedule/" + str(j["id"]) + "/edit' style='background:" + color + ";'>" + lbl + "</a>"
+                html += "</div>"
+        html += "</div>"
+    html += "<div style='margin-top:1rem;display:flex;flex-wrap:wrap;gap:8px;'>"
+    for st, color in JOB_STATUS_COLORS.items():
+        if st == "pending_confirmation":
+            continue
+        lbl = st.replace("_", " ").title()
+        html += "<span style='background:" + color + ";color:white;padding:3px 10px;border-radius:4px;font-size:12px;font-weight:bold;'>" + lbl + "</span>"
+    html += "</div>"
+    return html
+
+
+@app.route('/schedule/timesheets')
+@login_required
+def schedule_timesheets():
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT time_punches.*, candidates.first_name, candidates.last_name,"
+        " cleaning_jobs.scheduled_date, cleaning_jobs.service_type,"
+        " customers.first_name as cust_first, customers.last_name as cust_last"
+        " FROM time_punches"
+        " JOIN candidates ON time_punches.candidate_id = candidates.id"
+        " LEFT JOIN cleaning_jobs ON time_punches.cleaning_job_id = cleaning_jobs.id"
+        " LEFT JOIN customers ON cleaning_jobs.customer_id = customers.id"
+        " ORDER BY time_punches.clock_in DESC LIMIT 100")
+    punches = cursor.fetchall()
+    conn.close()
+    html = STYLE + admin_nav() + "<h1>Timesheets</h1>"
+    html += "<p><a class='btn' href='/schedule'>&larr; Back to Schedule</a></p>"
+    if not punches:
+        html += "<div class='info'><p>No time punches yet.</p></div>"
+        return html
+    html += "<style>.ts-table{width:100%;border-collapse:collapse;margin-top:1rem;}.ts-table th{background:#5C3D2E;color:#FFF9F0;padding:10px 12px;text-align:left;font-size:13px;}.ts-table td{padding:10px 12px;border-bottom:1px solid #eee;font-size:13px;vertical-align:middle;}.ts-table tr:hover td{background:#fdf6ec;}</style>"
+    html += "<table class='ts-table'><tr><th>Staff</th><th>Job</th><th>Clock In</th><th>Clock Out</th><th>Hours</th><th>Location</th></tr>"
+    for p in punches:
+        name = p["first_name"] + " " + p["last_name"]
+        job_label = (p["cust_first"] + " " + p["cust_last"] + " (" + str(p["scheduled_date"]) + ")") if p.get("cust_first") else "General"
+        cin  = str(p["clock_in"])[:16] if p["clock_in"] else "—"
+        cout = str(p["clock_out"])[:16] if p["clock_out"] else "Still clocked in"
+        if p["clock_in"] and p["clock_out"]:
+            diff = (p["clock_out"] - p["clock_in"]).total_seconds()
+            hrs = int(diff // 3600)
+            mins = int((diff % 3600) // 60)
+            hours_str = str(hrs) + "h " + str(mins) + "m"
+        else:
+            hours_str = "—"
+        if p["clock_in_lat"] and p["clock_in_lng"]:
+            map_url = "https://maps.google.com/?q=" + str(p["clock_in_lat"]) + "," + str(p["clock_in_lng"])
+            location = "<a href='" + map_url + "' target='_blank' style='color:#3498db;'>View Map</a>"
+        else:
+            location = "—"
+        html += "<tr><td>" + name + "</td><td>" + job_label + "</td><td>" + cin + "</td><td>" + cout + "</td><td>" + hours_str + "</td><td>" + location + "</td></tr>"
+    html += "</table>"
+    return html
+
+
+@app.route('/timeclock/clockin', methods=['POST'])
+def timeclock_clockin():
+    trainee_id = session.get('trainee_id')
+    if not trainee_id:
+        return redirect('/trainee-login')
+    job_id = request.form.get('job_id') or None
+    lat = request.form.get('lat') or None
+    lng = request.form.get('lng') or None
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT candidate_id FROM trainees WHERE id=%s', (trainee_id,))
+    t = cursor.fetchone()
+    if t:
+        cursor.execute('SELECT id FROM time_punches WHERE candidate_id=%s AND clock_out IS NULL', (t['candidate_id'],))
+        if not cursor.fetchone():
+            cursor.execute(
+                'INSERT INTO time_punches (candidate_id, cleaning_job_id, clock_in, clock_in_lat, clock_in_lng) VALUES (%s, %s, NOW(), %s, %s)',
+                (t['candidate_id'], job_id, lat, lng))
+            conn.commit()
+    conn.close()
+    return redirect('/timeclock')
+
+
+@app.route('/timeclock/clockout', methods=['POST'])
+def timeclock_clockout():
+    trainee_id = session.get('trainee_id')
+    if not trainee_id:
+        return redirect('/trainee-login')
+    lat = request.form.get('lat') or None
+    lng = request.form.get('lng') or None
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT candidate_id FROM trainees WHERE id=%s', (trainee_id,))
+    t = cursor.fetchone()
+    if t:
+        cursor.execute(
+            'UPDATE time_punches SET clock_out=NOW(), clock_out_lat=%s, clock_out_lng=%s WHERE candidate_id=%s AND clock_out IS NULL',
+            (lat, lng, t['candidate_id']))
+        conn.commit()
+    conn.close()
+    return redirect('/timeclock')
+
+
+@app.route('/timeclock')
+def timeclock_portal():
+    trainee_id = session.get('trainee_id')
+    if not trainee_id:
+        return redirect('/trainee-login')
+    import datetime as _dt
+    today = _dt.date.today()
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        'SELECT candidates.id as cand_id, candidates.first_name FROM trainees'
+        ' JOIN candidates ON trainees.candidate_id = candidates.id WHERE trainees.id=%s',
+        (trainee_id,))
+    cand = cursor.fetchone()
+    cand_id = cand['cand_id'] if cand else None
+    today_jobs = []
+    active_punch = None
+    if cand_id:
+        cursor.execute(
+            'SELECT cleaning_jobs.id, cleaning_jobs.scheduled_time, cleaning_jobs.service_type,'
+            ' customers.first_name as cust_first, customers.last_name as cust_last'
+            ' FROM cleaning_job_crew'
+            ' JOIN cleaning_jobs ON cleaning_job_crew.cleaning_job_id = cleaning_jobs.id'
+            ' JOIN customers ON cleaning_jobs.customer_id = customers.id'
+            ' WHERE cleaning_job_crew.candidate_id=%s AND cleaning_jobs.scheduled_date=%s'
+            " AND cleaning_jobs.status IN ('scheduled','in_progress')",
+            (cand_id, today))
+        today_jobs = cursor.fetchall()
+        cursor.execute('SELECT * FROM time_punches WHERE candidate_id=%s AND clock_out IS NULL', (cand_id,))
+        active_punch = cursor.fetchone()
+    conn.close()
+    tc_parts = []
+    tc_parts.append(STYLE + trainee_nav())
+    tc_parts.append('<h1>Time Clock</h1>')
+    tc_parts.append('<script>'
+                    'var _lat="",_lng="";'
+                    'if(navigator.geolocation){'
+                    'navigator.geolocation.getCurrentPosition('
+                    'function(p){_lat=p.coords.latitude;_lng=p.coords.longitude;'
+                    'document.getElementById("tc-status").textContent="Location ready."},'
+                    'function(){document.getElementById("tc-status").textContent="Location unavailable."}'
+                    ')}'
+                    'function injectGPS(la,ln){'
+                    'document.getElementById(la).value=_lat;'
+                    'document.getElementById(ln).value=_lng;'
+                    '}'
+                    '</script>')
+    tc_parts.append('<p id="tc-status" style="color:#888;font-size:13px;">Getting location...</p>')
+    if active_punch:
+        cin = str(active_punch['clock_in'])[:16]
+        tc_parts.append('<div class="success">'
+                        '<p><strong>Clocked in since:</strong> ' + cin + '</p>'
+                        '<form method="POST" action="/timeclock/clockout"'
+                        ' style="background:none;box-shadow:none;padding:0;">'
+                        '<input type="hidden" name="lat" id="out-lat">'
+                        '<input type="hidden" name="lng" id="out-lng">'
+                        '<button class="btn" type="submit" style="background:#c0392b;"'
+                        ' onclick="injectGPS(&apos;out-lat&apos;,&apos;out-lng&apos;)">'
+                        'Clock Out</button></form></div>')
+    elif today_jobs:
+        tc_parts.append('<p>Select your job to clock in:</p>')
+        for j in today_jobs:
+            t = format_job_time(j['scheduled_time']) if j['scheduled_time'] else ''
+            label = (t + ' - ' if t else '') + j['cust_first'] + ' ' + j['cust_last']
+            jid = str(j['id'])
+            la = 'lat-' + jid
+            ln = 'lng-' + jid
+            oc = 'injectGPS(&apos;' + la + '&apos;,&apos;' + ln + '&apos;)'
+            tc_parts.append(
+                '<div class="application">'
+                '<p><strong>' + label + '</strong></p>'
+                '<p>' + (j['service_type'] or '') + '</p>'
+                '<form method="POST" action="/timeclock/clockin"'
+                ' style="background:none;box-shadow:none;padding:0;">'
+                '<input type="hidden" name="job_id" value="' + jid + '">'
+                '<input type="hidden" name="lat" id="' + la + '">'
+                '<input type="hidden" name="lng" id="' + ln + '">'
+                '<button class="btn btn-success" type="submit"'
+                ' onclick="' + oc + '">Clock In</button>'
+                '</form></div>'
+            )
+    else:
+        tc_parts.append('<div class="info"><p>No jobs assigned for today.</p></div>')
+    tc_parts.append('<p style="margin-top:1rem;"><a class="btn" href="/trainee/documents"'
+                    ' style="background:#95a5a6;">Back to Portal</a></p>')
+    return ''.join(tc_parts)
 
 COMPLIANCE_CATEGORIES = ['Insurance', 'Tax Filing', 'License', 'Registration', 'Payroll', 'Other']
 COMPLIANCE_RECURRENCE = {'one_time': 'One-Time', 'monthly': 'Monthly', 'quarterly': 'Quarterly', 'annual': 'Annual'}
