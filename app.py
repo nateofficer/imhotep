@@ -3870,8 +3870,11 @@ def convert_lead(lead_id):
     if row is None:
         conn.close()
         return redirect('/leads')
-    cols = [d[0] for d in cursor.description]
-    lead = dict(zip(cols, row))
+    if isinstance(row, dict):
+        lead = row
+    else:
+        cols = [d[0] for d in cursor.description]
+        lead = dict(zip(cols, row))
 
     # Name: handle either a single 'name' column or first/last columns
     full_name = (lead.get('name') or
