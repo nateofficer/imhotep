@@ -2428,6 +2428,9 @@ def crm_list():
                 {photo_html}
                 <p class="form-note">Added: {str(lead["created_date"])[:10]}</p>
                 <a class="btn" href="/crm/{lead["id"]}/edit">Edit / Update</a>
+                <form method="POST" action="/leads/{lead["id"]}/convert" onsubmit="return confirm('Convert this lead to a customer?');" style="display:inline-block;margin-top:10px;margin-right:8px;box-shadow:none;padding:0;background:none;">
+                    <button class="btn" type="submit" style="background:#28a745;color:#fff;border-color:#28a745;">Convert to Customer</button>
+                </form>
                 <form method="POST" action="/crm/{lead["id"]}/delete" onsubmit="return confirm('Delete this lead?');"
                       style="display:inline-block;margin-top:10px;box-shadow:none;padding:0;background:none;">
                     <button class="btn btn-danger" type="submit">Delete</button>
@@ -3855,6 +3858,52 @@ def trainee_sign_document(assignment_id):
 
 # ── End Document Library Routes ───────────────────────────────────────────────
 
+
+
+
+@app.route('/leads/<int:lead_id>/convert', methods=['POST'])
+def convert_lead(lead_id):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM leads WHERE id = %s', (lead_id,))
+    row = cursor.fetchone()
+    if row is None:
+        conn.close()
+        return redirect('/leads')
+    cols = [d[0] for d in cursor.description]
+    lead = dict(zip(cols, row))
+
+    # Name: handle either a single 'name' column or first/last columns
+    full_name = (lead.get('name') or
+                 ((lead.get('first_name') or '') + ' ' + (lead.get('last_name') or '')).strip())
+    parts = (full_name or 'Unknown').split(' ', 1)
+    first_name = parts[0]
+    last_name = parts[1] if len(parts) > 1 else ''
+
+    phone = (lead.get('phone') or '').strip()
+    email = (lead.get('email') or '').strip()
+    address = (lead.get('address') or '').strip()
+    lead_source_id = lead.get('lead_source_id') or lead.get('source_id') or None
+
+    # Duplicate guard: same phone = same customer
+    existing = None
+    if phone:
+        cursor.execute('SELECT id FROM customers WHERE phone = %s', (phone,))
+        existing = cursor.fetchone()
+
+    if existing is None:
+        cursor.execute("""INSERT INTO customers
+            (first_name, last_name, phone, email, address, active, lead_source_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+            (first_name, last_name, phone, email, address, 1, lead_source_id))
+
+    # Mark the lead as done so pipeline counts stay honest
+    if 'status' in lead:
+        cursor.execute('UPDATE leads SET status = %s WHERE id = %s', ('done', lead_id))
+
+    conn.commit()
+    conn.close()
+    return redirect('/customers')
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
