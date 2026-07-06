@@ -1025,7 +1025,7 @@ def view_applications():
         for app_row in apps:
             resume_link = ''
             if app_row['resume_filename']:
-                resume_link = f'<a class="btn" href="/resume/{app_row["resume_filename"]}" target="_blank">View Resume</a> '
+                resume_link = f'<a class="btn" href="{app_row["resume_filename"] if str(app_row["resume_filename"]).startswith("http") else "/resume/" + app_row["resume_filename"]}" target="_blank">View Resume</a> '
 
             license_link = ''
             if app_row['license_filename']:
@@ -1214,7 +1214,8 @@ def apply(job_id):
             if resume_file and resume_file.filename:
                 timestamp = str(int(time.time()))
                 resume_filename = f"{timestamp}_resume_{resume_file.filename}"
-                resume_file.save(os.path.join(UPLOAD_FOLDER, resume_filename))
+                _up = cloudinary.uploader.upload(resume_file, resource_type="auto", folder="resumes")
+                resume_filename = _up.get('secure_url')
 
         license_filename = None
         if 'license' in request.files:
@@ -1333,9 +1334,7 @@ def apply(job_id):
         <h2>Documents</h2>
         <label>Resume (PDF, DOC, etc.):</label>
         <input type="file" name="resume">
-        <label>Driver's License (photo or scan, required):</label>
-        <input type="file" name="license" required accept="image/*,.pdf">
-        <p class="form-note">Used for identity verification and background check. Stored securely.</p>
+        <p class="form-note">Finalists will be asked to provide a driver's license at the background-check stage.</p>
 
         <button class="btn" type="submit">Submit Application</button>
     </form>
