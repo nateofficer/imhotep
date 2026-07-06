@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, redirect, send_from_directory, session, url_for
+from urllib.parse import quote
 import cloudinary
 import cloudinary.uploader
 import pymysql
@@ -1031,6 +1032,12 @@ def view_applications():
             if app_row['license_filename']:
                 license_link = f'<a class="btn" href="/resume/{app_row["license_filename"]}" target="_blank">View Driver\'s License</a>'
 
+            _msg = quote(f"Hi {app_row['first_name']}, this is Nate with Casey's Cleaning. Thanks for applying! I'd like to schedule a quick phone interview. What day and time work best for you?")
+            contact_html = (
+                f'<a class="btn" href="tel:{app_row["phone"]}" style="background:#17a2b8;">Call</a> '
+                f'<a class="btn" href="sms:{app_row["phone"]}?&body={_msg}" style="background:#6f42c1;">Text</a> '
+                f'<a class="btn" href="mailto:{app_row["email"]}?subject=Phone%20Interview%20-%20Casey%27s%20Cleaning&body={_msg}" style="background:#fd7e14;">Email</a>'
+            )
             flag_html = '<span class="flag-badge">FLAGGED</span>' if app_row['flagged'] else ''
             hired_html = '<span class="hired-badge">HIRED</span>' if app_row['hired'] else ''
             score = app_row['score'] if app_row['score'] is not None else 0
@@ -1066,6 +1073,7 @@ def view_applications():
                     <div class="answer-row"><strong>Has own cleaning supplies:</strong> {yes_no(app_row['has_supplies'])}</div>
                 </div>
                 <p style="margin-top:15px;">{resume_link}{license_link}</p>
+                <p style="margin-top:8px;"><strong>Schedule interview:</strong> {contact_html}</p>
                 {hire_button}
                 <form method="POST" action="/update-status/{app_row['id']}" style="display:inline-block; margin-left:10px;">
                     <select name="status" onchange="this.form.submit()" style="padding:4px 8px; border-radius:4px; border:1px solid #ccc; font-size:13px;">
