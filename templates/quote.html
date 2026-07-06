@@ -426,6 +426,14 @@
         <input type="range" id="bathrooms" min="0" max="5" value="2"
                oninput="updateVal('bathroomVal', this.value); calcPrice()">
       </div>
+          <div class="slider-group">
+            <div class="slider-label">
+              <span>Approx. Square Feet</span>
+              <span class="slider-value" id="sqftVal">2000</span>
+            </div>
+            <input type="range" id="sqft" min="500" max="6000" step="250" value="2000"
+                   oninput="updateVal('sqftVal', this.value); calcPrice()">
+          </div>
     </div>
   </div>
 
@@ -544,6 +552,7 @@
         <input type="hidden" name="cleaning_type" id="h_type" value="standard">
         <input type="hidden" name="bedrooms" id="h_beds" value="3">
         <input type="hidden" name="bathrooms" id="h_baths" value="2">
+      <input type="hidden" name="sqft" id="h_sqft" value="2000">
         <input type="hidden" name="addons" id="h_addons" value="">
         <input type="hidden" name="estimate" id="h_estimate" value="215">
 
@@ -641,12 +650,20 @@
     const baths = parseInt(document.getElementById('bathrooms').value);
     const p     = BASE[currentType];
     const MIN_PRICE = 120;  // lowest quote we will ever show
-  const total = Math.max(p.base + (beds * p.bed) + (baths * p.bath) + addonTotal, MIN_PRICE);
+  const sqft = parseInt(document.getElementById('sqft').value);
+  // SQFT PRICING TABLE — edit these numbers freely
+  let sqftAdd = 0;
+  if (sqft >= 4000)      sqftAdd = 90;
+  else if (sqft >= 3000) sqftAdd = 60;
+  else if (sqft >= 2000) sqftAdd = 30;
+  else if (sqft >= 1000) sqftAdd = 15;
+  const total = Math.max(p.base + (beds * p.bed) + (baths * p.bath) + sqftAdd + addonTotal, MIN_PRICE);
 
     document.getElementById('estimateAmt').textContent = '$' + total;
     document.getElementById('summaryAmt').textContent  = '$' + total;
     document.getElementById('h_beds').value     = beds;
     document.getElementById('h_baths').value    = baths;
+    document.getElementById('h_sqft').value  = sqft;
     document.getElementById('h_estimate').value = total;
 
     const typeName = currentType === 'moveout' ? 'Move-Out Clean'

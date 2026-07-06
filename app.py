@@ -2603,6 +2603,7 @@ def quote_request():
         cleaning_type = request.form.get('cleaning_type', 'standard')
         bedrooms      = request.form.get('bedrooms', '3')
         bathrooms     = request.form.get('bathrooms', '2')
+        sqft        = request.form.get('sqft', '')
         estimate      = request.form.get('estimate', '0')
 
         photo_urls = []
@@ -2618,7 +2619,7 @@ def quote_request():
                 except Exception:
                     pass
 
-        full_notes = f"[Quote] Type: {cleaning_type.upper()} | Beds: {bedrooms} | Baths: {bathrooms} | Estimate: ${estimate}"
+        full_notes = f"[Quote] Type: {cleaning_type.upper()} | Beds: {bedrooms} | Baths: {bathrooms} | SqFt: {sqft} | Estimate: ${estimate}"
         if notes:
             full_notes += f" | Notes: {notes}"
         if address:
