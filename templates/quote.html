@@ -415,15 +415,15 @@
           <span>Bedrooms</span>
           <span class="slider-value" id="bedroomVal">3</span>
         </div>
-        <input type="range" id="bedrooms" min="1" max="6" value="3"
-               oninput="updateVal('bedroomVal', this.value); calcPrice()">
+        <input type="range" id="bedrooms" min="0" max="6" value="3"
+               oninput="updateVal('bedroomVal', this.value == 0 ? 'Studio' : this.value); calcPrice()">
       </div>
       <div class="slider-group">
         <div class="slider-label">
           <span>Bathrooms</span>
           <span class="slider-value" id="bathroomVal">2</span>
         </div>
-        <input type="range" id="bathrooms" min="1" max="5" value="2"
+        <input type="range" id="bathrooms" min="0" max="5" value="2"
                oninput="updateVal('bathroomVal', this.value); calcPrice()">
       </div>
     </div>
@@ -640,7 +640,8 @@
     const beds  = parseInt(document.getElementById('bedrooms').value);
     const baths = parseInt(document.getElementById('bathrooms').value);
     const p     = BASE[currentType];
-    const total = p.base + (beds * p.bed) + (baths * p.bath) + addonTotal;
+    const MIN_PRICE = 120;  // lowest quote we will ever show
+  const total = Math.max(p.base + (beds * p.bed) + (baths * p.bath) + addonTotal, MIN_PRICE);
 
     document.getElementById('estimateAmt').textContent = '$' + total;
     document.getElementById('summaryAmt').textContent  = '$' + total;
@@ -654,7 +655,7 @@
                    : 'Standard Clean';
     const note = TYPE_NOTES[currentType] || '';
     document.getElementById('summaryLine').innerHTML =
-      `<strong>${typeName}</strong> · ${beds} bed / ${baths} bath${note} · Estimated <strong id="summaryAmt">$${total}</strong>`;
+      `<strong>${typeName}</strong> · ${beds === 0 ? 'Studio' : beds + ' bed'} / ${baths} bath${note} · Estimated <strong id="summaryAmt">$${total}</strong>`;
   }
 
   // Init
