@@ -1032,11 +1032,14 @@ def view_applications():
             if app_row['license_filename']:
                 license_link = f'<a class="btn" href="/resume/{app_row["license_filename"]}" target="_blank">View Driver\'s License</a>'
 
-            _msg = quote(f"Hi {app_row['first_name']}, this is Nate with Casey's Cleaning. Thanks for applying! I'd like to schedule a quick phone interview. What day and time work best for you?")
+            _pos = app_row.get('job_title') or 'Cleaner'
+            _sms_msg = quote(f"Hi {app_row['first_name']}, this is Nathan with Casey's Cleaning. Thanks for applying for the {_pos} position! I'd like to schedule a quick phone interview - what days and times work best for you this week?")
+            _email_subj = quote("Interview Invitation - Casey's Cleaning")
+            _email_body = quote(f"Hi {app_row['first_name']},\n\nThank you for applying for the {_pos} position at Casey's Cleaning. We've reviewed your application and would like to schedule a brief phone interview.\n\nPlease reply with two or three days and times that work for you this week, and I'll confirm one.\n\nLooking forward to speaking with you,\nNathan\nCasey's Cleaning")
             contact_html = (
                 f'<a class="btn" href="tel:{app_row["phone"]}" style="background:#17a2b8;">Call</a> '
-                f'<a class="btn" href="sms:{app_row["phone"]}?&body={_msg}" style="background:#6f42c1;">Text</a> '
-                f'<a class="btn" href="mailto:{app_row["email"]}?subject=Phone%20Interview%20-%20Casey%27s%20Cleaning&body={_msg}" style="background:#fd7e14;">Email</a>'
+                f'<a class="btn" href="sms:{app_row["phone"]}?&body={_sms_msg}" style="background:#6f42c1;">Text</a> '
+                f'<a class="btn" href="https://mail.google.com/mail/?view=cm&fs=1&to={app_row["email"]}&su={_email_subj}&body={_email_body}" target="_blank" style="background:#fd7e14;">Email</a>'
             )
             flag_html = '<span class="flag-badge">FLAGGED</span>' if app_row['flagged'] else ''
             hired_html = '<span class="hired-badge">HIRED</span>' if app_row['hired'] else ''
