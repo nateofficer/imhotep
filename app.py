@@ -613,6 +613,15 @@ def dashboard():
         compliance_due_count = 0
         compliance_due_items = []
 
+    # quote page view counter
+    try:
+        cursor.execute("CREATE TABLE IF NOT EXISTS page_counters (name VARCHAR(64) PRIMARY KEY, count INT NOT NULL DEFAULT 0)")
+        cursor.execute("SELECT count FROM page_counters WHERE name = 'quote_views'")
+        _qv = cursor.fetchone()
+        quote_view_count = _qv['count'] if _qv else 0
+    except Exception:
+        quote_view_count = 0
+
     conn.close()
 
     # Build application rows
@@ -844,6 +853,11 @@ def dashboard():
                 <div class="stat-icon">📞</div>
                 <div class="stat-number">{lead_count}</div>
                 <div class="stat-label">CRM Leads</div>
+            </a>
+            <a class="dash-stat" href="/quote" target="_blank">
+                <div class="stat-icon">🧮</div>
+                <div class="stat-number">{quote_view_count}</div>
+                <div class="stat-label">Quote Page Views</div>
             </a>
             <a class="dash-stat" href="/schedule">
                 <div class="stat-icon">📅</div>
@@ -2640,6 +2654,17 @@ def quote_request():
         conn.close()
 
         return render_template('quote_thanks.html', name=first_name, estimate=estimate)
+
+    # --- count quote-page visits (Request a Quote clicks) ---
+    try:
+        _c = get_db()
+        _cur = _c.cursor()
+        _cur.execute("CREATE TABLE IF NOT EXISTS page_counters (name VARCHAR(64) PRIMARY KEY, count INT NOT NULL DEFAULT 0)")
+        _cur.execute("INSERT INTO page_counters (name, count) VALUES ('quote_views', 1) ON DUPLICATE KEY UPDATE count = count + 1")
+        _c.commit()
+        _c.close()
+    except Exception:
+        pass
 
     return render_template('quote.html')
 
