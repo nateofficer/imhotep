@@ -1029,6 +1029,15 @@ def view_applications():
         ORDER BY candidates.flagged ASC, candidates.score DESC, candidates.applied_date DESC
     ''')
     apps = cursor.fetchall()
+    interview_scores = {}
+    try:
+        cursor.execute("CREATE TABLE IF NOT EXISTS phone_interviews (id INT AUTO_INCREMENT PRIMARY KEY, candidate_id INT NOT NULL, interviewer VARCHAR(150), interview_date DATE, answers TEXT, scores TEXT, total_score INT, recommendation VARCHAR(50), notes TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+        conn.commit()
+        cursor.execute("SELECT candidate_id, total_score FROM phone_interviews")
+        for _ir in cursor.fetchall():
+            interview_scores[_ir['candidate_id']] = _ir['total_score']
+    except Exception:
+        interview_scores = {}
     conn.close()
 
     html = STYLE + admin_nav() + '<h1>Job Applications</h1>'
@@ -1059,6 +1068,9 @@ def view_applications():
             hired_html = '<span class="hired-badge">HIRED</span>' if app_row['hired'] else ''
             score = app_row['score'] if app_row['score'] is not None else 0
             score_html = f'<span class="score-badge {score_class(score)}">Score: {score}/100</span>'
+            _iv = interview_scores.get(app_row['id'])
+            interview_html = f'<span class="score-badge {score_class(_iv)}">Interview: {_iv}/100</span>' if _iv is not None else ''
+            interview_btn = f'<a class="btn" href="/admin/candidate/{app_row["id"]}/interview" style="background:#2c3e50;">Phone Interview</a>'
             flagged_class = ' flagged' if app_row['flagged'] else ''
             tech_level = app_row['tech_level'] if app_row['tech_level'] is not None else 'Not answered'
 
@@ -1072,7 +1084,7 @@ def view_applications():
 
             html += f'''
             <div class="application{flagged_class}">
-                <h2>{app_row['first_name']} {app_row['last_name']} {score_html} {flag_html} {hired_html}</h2>
+                <h2>{app_row['first_name']} {app_row['last_name']} {score_html} {interview_html} {flag_html} {hired_html}</h2>
                 <p><strong>Position:</strong> {app_row['job_title'] or 'N/A'}</p>
                 <p><strong>Email:</strong> {app_row['email']}</p>
                 <p><strong>Phone:</strong> {app_row['phone'] or 'Not provided'}</p>
@@ -1091,6 +1103,7 @@ def view_applications():
                 </div>
                 <p style="margin-top:15px;">{resume_link}{license_link}</p>
                 <p style="margin-top:8px;"><strong>Schedule interview:</strong> {contact_html}</p>
+                <p style="margin-top:8px;"><strong>Phone interview:</strong> {interview_btn}</p>
                 {hire_button}
                 <form method="POST" action="/update-status/{app_row['id']}" style="display:inline-block; margin-left:10px;">
                     <select name="status" onchange="this.form.submit()" style="padding:4px 8px; border-radius:4px; border:1px solid #ccc; font-size:13px;">
@@ -1104,6 +1117,149 @@ def view_applications():
             </div>
             '''
     return html
+
+
+@app.route('/admin/candidate/<int:candidate_id>/interview', methods=['GET', 'POST'])
+@login_required
+def candidate_interview(candidate_id):
+    import json as _json
+    import html as _html
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("CREATE TABLE IF NOT EXISTS phone_interviews (id INT AUTO_INCREMENT PRIMARY KEY, candidate_id INT NOT NULL, interviewer VARCHAR(150), interview_date DATE, answers TEXT, scores TEXT, total_score INT, recommendation VARCHAR(50), notes TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+    conn.commit()
+
+    cursor.execute("SELECT * FROM candidates WHERE id = %s", (candidate_id,))
+    cand = cursor.fetchone()
+    if not cand:
+        conn.close()
+        return redirect('/applications')
+
+    questions = [
+        ("Experience", "Tell me about your experience in cleaning. How long, and what kinds of spaces?"),
+        ("Challenges", "Describe a challenging cleaning situation. How did you handle it and what was the outcome?"),
+        ("Cleaning Process", "Walk me through your process for cleaning a room start to finish. How do you make sure nothing gets missed?"),
+        ("Products & Tools", "What products and tools do you prefer? Do you have your own supplies and equipment?"),
+        ("Learning New Methods", "Are you open to learning and adapting to our specific methods and standards?"),
+        ("Teamwork", "Tell me about working with a team. How do you collaborate and coordinate your work?"),
+        ("Transportation", "Do you have reliable transportation to different job sites?"),
+        ("Quality Control", "How do you feel about supervisors or clients double-checking your work? Give an example of handling feedback."),
+        ("Taking Direction", "Describe a time you received direct criticism about your work. How did you respond?"),
+        ("Pay Expectations", "What are your hourly rate expectations for this position?"),
+    ]
+
+    if request.method == 'POST':
+        answers = {}
+        scores = {}
+        total = 0
+        for i in range(1, 11):
+            answers[str(i)] = request.form.get('answer_%d' % i, '').strip()
+            try:
+                sc = int(request.form.get('score_%d' % i, 0) or 0)
+            except ValueError:
+                sc = 0
+            scores[str(i)] = sc
+            total += sc
+        interviewer = request.form.get('interviewer', '').strip()
+        interview_date = request.form.get('interview_date', '').strip() or None
+        recommendation = request.form.get('recommendation', '').strip()
+        notes = request.form.get('notes', '').strip()
+
+        cursor.execute("SELECT id FROM phone_interviews WHERE candidate_id = %s ORDER BY id DESC LIMIT 1", (candidate_id,))
+        existing = cursor.fetchone()
+        if existing:
+            cursor.execute(
+                "UPDATE phone_interviews SET interviewer=%s, interview_date=%s, answers=%s, scores=%s, total_score=%s, recommendation=%s, notes=%s WHERE id=%s",
+                (interviewer, interview_date, _json.dumps(answers), _json.dumps(scores), total, recommendation, notes, existing['id'])
+            )
+        else:
+            cursor.execute(
+                "INSERT INTO phone_interviews (candidate_id, interviewer, interview_date, answers, scores, total_score, recommendation, notes) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+                (candidate_id, interviewer, interview_date, _json.dumps(answers), _json.dumps(scores), total, recommendation, notes)
+            )
+        conn.commit()
+        conn.close()
+        return redirect('/applications')
+
+    cursor.execute("SELECT * FROM phone_interviews WHERE candidate_id = %s ORDER BY id DESC LIMIT 1", (candidate_id,))
+    existing = cursor.fetchone()
+    conn.close()
+
+    saved_answers, saved_scores = {}, {}
+    saved_interviewer = saved_date = saved_rec = saved_notes = ''
+    saved_total = None
+    if existing:
+        try:
+            saved_answers = _json.loads(existing['answers']) if existing['answers'] else {}
+            saved_scores = _json.loads(existing['scores']) if existing['scores'] else {}
+        except Exception:
+            saved_answers, saved_scores = {}, {}
+        saved_interviewer = existing['interviewer'] or ''
+        saved_date = str(existing['interview_date']) if existing['interview_date'] else ''
+        saved_rec = existing['recommendation'] or ''
+        saved_notes = existing['notes'] or ''
+        saved_total = existing['total_score']
+
+    app_score = cand['score'] if cand['score'] is not None else 0
+    cand_name = _html.escape("%s %s" % (cand['first_name'], cand['last_name']))
+
+    q_html = ''
+    for idx, (qtitle, qtext) in enumerate(questions, start=1):
+        ans = _html.escape(saved_answers.get(str(idx), ''))
+        sel = saved_scores.get(str(idx), '')
+        options = '<option value="">-</option>'
+        for n in range(1, 11):
+            selected = 'selected' if str(sel) == str(n) else ''
+            options += '<option value="%d" %s>%d</option>' % (n, selected, n)
+        q_html += (
+            '<div class="iv-q">'
+            '<h3>%d. %s</h3>'
+            '<p class="iv-prompt">%s</p>'
+            '<textarea name="answer_%d" rows="3" placeholder="Type their answer during the call...">%s</textarea>'
+            '<label>Score (1-10): <select name="score_%d">%s</select></label>'
+            '</div>'
+        ) % (idx, qtitle, _html.escape(qtext), idx, ans, idx, options)
+
+    total_badge = ''
+    if saved_total is not None:
+        total_badge = '<span class="score-badge %s">Interview: %s/100</span>' % (score_class(saved_total), saved_total)
+
+    rec_options = ''
+    for r in ['', 'Move to next round', 'Reject', 'Need more info']:
+        selected = 'selected' if saved_rec == r else ''
+        label = r if r else '-- choose --'
+        rec_options += '<option value="%s" %s>%s</option>' % (r, selected, label)
+
+    style_block = (
+        '<style>'
+        '.iv-q { background:#fff; border:1px solid #e0e0e0; border-radius:8px; padding:16px; margin-bottom:14px; }'
+        '.iv-q h3 { margin:0 0 4px; }'
+        '.iv-prompt { color:#666; font-size:14px; margin:0 0 10px; }'
+        '.iv-q textarea { width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; box-sizing:border-box; }'
+        '.iv-q label { display:block; margin-top:8px; font-weight:bold; }'
+        '.iv-q select { padding:6px; border-radius:6px; border:1px solid #ccc; margin-left:6px; }'
+        '.iv-meta { margin-bottom:14px; }'
+        '.iv-meta label { margin-right:20px; font-weight:bold; }'
+        '.iv-meta input { padding:6px; border-radius:6px; border:1px solid #ccc; margin-left:6px; }'
+        '</style>'
+    )
+
+    body = STYLE + admin_nav()
+    body += '<h1>Phone Interview: %s</h1>' % cand_name
+    body += '<p class="form-note">Application score: <span class="score-badge %s">App: %s/100</span> %s</p>' % (score_class(app_score), app_score, total_badge)
+    body += '<form method="POST">'
+    body += '<div class="iv-meta">'
+    body += '<label>Interviewer: <input type="text" name="interviewer" value="%s"></label>' % _html.escape(saved_interviewer)
+    body += '<label>Date: <input type="date" name="interview_date" value="%s"></label>' % saved_date
+    body += '</div>'
+    body += q_html
+    body += '<div class="iv-q"><h3>Overall Notes</h3><textarea name="notes" rows="4" placeholder="Overall impression, anything notable...">%s</textarea></div>' % _html.escape(saved_notes)
+    body += '<div class="iv-q"><h3>Recommendation</h3><select name="recommendation">%s</select></div>' % rec_options
+    body += '<button class="btn btn-success" type="submit">Save Interview</button> '
+    body += '<a class="btn" href="/applications">Back to Applications</a>'
+    body += '</form>'
+    body += style_block
+    return body
 
 
 @app.route('/hire/<int:candidate_id>', methods=['POST'])
