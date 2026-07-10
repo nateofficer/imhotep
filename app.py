@@ -176,6 +176,42 @@ def init_db():
                         '$15-17/hr DOE',
                         'Las Vegas, NV'))
 
+    # --- grade columns (safe if they already exist) ---
+    try:
+        cursor.execute('SELECT score FROM module_progress LIMIT 1')
+    except Exception:
+        try:
+            cursor.execute('ALTER TABLE module_progress ADD COLUMN score INT')
+        except Exception:
+            pass
+    try:
+        cursor.execute('SELECT pass_percent FROM training_modules LIMIT 1')
+    except Exception:
+        try:
+            cursor.execute('ALTER TABLE training_modules ADD COLUMN pass_percent INT DEFAULT 100')
+        except Exception:
+            pass
+
+    # --- seed the Cleaning Procedures Test once ---
+    try:
+        cursor.execute('SELECT id FROM training_modules WHERE title = %s', ('Cleaning Procedures Test',))
+        _existing_mod = cursor.fetchone()
+        if not _existing_mod:
+            import json as _qjson
+            _questions = _qjson.loads(r'''[["In the three-person plan, what are the three roles?", "Cleaner, floor person, and bathroom person", "Manager, cleaner, and driver", "Duster, mopper, and windexer", "Two cleaners and a supervisor", "a"], ["In the two-person method, where does the \"cleaner\" begin?", "The kitchen", "The master bathroom (sink, toilet, mirrors) but NOT the shower", "The living room", "The laundry room", "b"], ["In the two-person method, who takes the master shower and washes the bathroom floors?", "The \"cleaner\"", "The \"floor\" person", "The client", "Nobody", "b"], ["Why should you avoid jumping in to \"help\" someone else's assigned job?", "It's against company policy", "It slows everything down, and jobs get repeated or forgotten", "It wastes cleaning solution", "It doesn't matter", "b"], ["Whoever is first into the kitchen should start with...", "Mopping the floor", "Counters, stove top, microwave, toaster - anything that makes crumbs", "Windexing the windows", "Emptying the fridge", "b"], ["When you clean a bedroom or living area, where do you start?", "In the middle of the room", "At one end, and work your way around", "At the ceiling", "Wherever looks dirtiest", "b"], ["What do you dust with?", "A dry rag", "Clean towels and a bucket of water with cleaner and bleach", "A feather duster only", "Window cleaner", "b"], ["In the bathroom, what comes right after gathering supplies?", "Clean the toilet first", "Clear everything out (toiletries, rugs, towels), then dust vents and cabinets", "Wash the floor", "Start the kitchen", "b"], ["At the end of the kitchen, instead of a second person coming in to windex, that person should...", "Wait outside", "Put down mats, turn off lights, put away supplies, take out garbage, load the car", "Re-dust the counters", "Start another bathroom", "b"], ["What is the very last thing you do when finishing a house?", "Dust the ceiling fans", "Sweep, mop, and vacuum your way out the door", "Wipe the windows again", "Take a break", "b"]]''')
+            _content = _qjson.loads(r'''"This test checks that you understand our cleaning routine after completing your training. Review the Routine, the room-by-room cleaning steps, and the training video, then answer all questions. You need 80% (8 of 10) to pass. You can retake it as many times as you need."''')
+            cursor.execute("SELECT video_url FROM training_modules WHERE video_url IS NOT NULL AND video_url != '' ORDER BY id LIMIT 1")
+            _vrow = cursor.fetchone()
+            _video = _vrow['video_url'] if _vrow else ''
+            cursor.execute('INSERT INTO training_modules (title, description, video_url, content, required, pass_percent) VALUES (%s,%s,%s,%s,%s,%s)',
+                           ('Cleaning Procedures Test', "Final test on Casey's cleaning procedures and team routine.", _video, _content, 1, 80))
+            _mod_id = cursor.lastrowid
+            for _q in _questions:
+                cursor.execute('INSERT INTO quiz_questions (module_id, question, option_a, option_b, option_c, option_d, correct_answer) VALUES (%s,%s,%s,%s,%s,%s,%s)',
+                               (_mod_id, _q[0], _q[1], _q[2], _q[3], _q[4], _q[5]))
+    except Exception as _seed_err:
+        print('seed warning:', _seed_err)
+
     conn.commit()
     conn.close()
 
@@ -1825,6 +1861,12 @@ def trainee_detail(trainee_id):
         conn.close()
         return redirect('/trainees')
 
+    _results = []
+    try:
+        cursor.execute('SELECT tm.title AS mtitle, mp.passed, mp.score, mp.attempts, mp.completed_date FROM module_progress mp JOIN training_modules tm ON tm.id = mp.module_id WHERE mp.trainee_id = %s ORDER BY tm.title', (trainee_id,))
+        _results = cursor.fetchall()
+    except Exception:
+        _results = []
     conn.close()
 
     html = STYLE + admin_nav() + f'<h1>{t["first_name"]} {t["last_name"]}</h1>'
@@ -1839,6 +1881,20 @@ def trainee_detail(trainee_id):
         <p class="form-note">Send this code to {t['first_name']} along with the training login URL. They will use their email ({t['email']}) and this code to log in.</p>
     </div>
     '''
+    _rows = ''
+    for _r in _results:
+        _sc = _r.get('score')
+        _sc_txt = ('%d%%' % _sc) if _sc is not None else '-'
+        _status = '<span style="color:#27ae60;font-weight:bold;">PASSED</span>' if _r['passed'] else '<span style="color:#c0392b;font-weight:bold;">Not passed</span>'
+        _date_txt = _r['completed_date'] if _r['completed_date'] else ''
+        _rows += '<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>' % (_r['mtitle'], _status, _sc_txt, _r['attempts'], _date_txt)
+    if _rows:
+        html += ('<div class="application"><h3>Training Results (management only)</h3>'
+                 '<table style="width:100%;border-collapse:collapse;" border="1" cellpadding="6">'
+                 '<tr><th align="left">Module</th><th align="left">Status</th><th align="left">Grade</th><th align="left">Attempts</th><th align="left">Completed</th></tr>'
+                 + _rows + '</table></div>')
+    else:
+        html += '<div class="application"><h3>Training Results (management only)</h3><p class="form-note">No test results yet.</p></div>'
     return html
 
 
@@ -1988,7 +2044,7 @@ def view_module(module_id):
 
     if questions:
         html += f'<h2>Quiz ({len(questions)} questions)</h2>'
-        html += '<p class="form-note">You must answer ALL questions correctly to pass. Take your time.</p>'
+        html += '<p class="form-note">Answer each question, then submit. Take your time.</p>'
         html += f'<form method="POST" action="/training/module/{module_id}/submit">'
         for i, q in enumerate(questions, 1):
             html += f'<div class="quiz-question"><p>Q{i}: {q["question"]}</p>'
@@ -2025,7 +2081,16 @@ def submit_quiz(module_id):
         if answer == q['correct_answer']:
             correct += 1
 
-    passed = (correct == total)
+    percent = int(round((correct / total) * 100)) if total else 0
+    threshold = 100
+    try:
+        cursor.execute('SELECT pass_percent FROM training_modules WHERE id = %s', (module_id,))
+        _mrow = cursor.fetchone()
+        if _mrow and _mrow.get('pass_percent') is not None:
+            threshold = _mrow['pass_percent']
+    except Exception:
+        threshold = 100
+    passed = (percent >= threshold)
 
     cursor.execute('SELECT * FROM module_progress WHERE trainee_id = %s AND module_id = %s',
                    (trainee_id, module_id))
@@ -2033,16 +2098,12 @@ def submit_quiz(module_id):
 
     if existing:
         if passed:
-            cursor.execute('''UPDATE module_progress
-                              SET passed = 1, attempts = attempts + 1, completed_date = NOW()
-                              WHERE id = %s''', (existing['id'],))
+            cursor.execute('UPDATE module_progress SET passed = 1, score = %s, attempts = attempts + 1, completed_date = NOW() WHERE id = %s', (percent, existing['id']))
         else:
-            cursor.execute('UPDATE module_progress SET attempts = attempts + 1 WHERE id = %s',
-                           (existing['id'],))
+            cursor.execute('UPDATE module_progress SET score = %s, attempts = attempts + 1 WHERE id = %s', (percent, existing['id']))
     else:
-        cursor.execute('''INSERT INTO module_progress (trainee_id, module_id, passed, attempts, completed_date)
-                          VALUES (%s, %s, %s, 1, %s)''',
-                       (trainee_id, module_id, 1 if passed else 0,
+        cursor.execute('INSERT INTO module_progress (trainee_id, module_id, passed, score, attempts, completed_date) VALUES (%s, %s, %s, %s, 1, %s)',
+                       (trainee_id, module_id, 1 if passed else 0, percent,
                         time.strftime('%Y-%m-%d %H:%M:%S') if passed else None))
     conn.commit()
     conn.close()
@@ -2060,7 +2121,7 @@ def submit_quiz(module_id):
         html += f'''
         <h1>Not Quite</h1>
         <div class="error">
-            <p>You got {correct} out of {total} correct. You need 100% to pass this module.</p>
+            <p>You got {correct} out of {total} correct ({percent}%). You need {threshold}% to pass this module.</p>
             <p>Review the material and try again — you can attempt as many times as you need.</p>
         </div>
         <p><a class="btn" href="/training/module/{module_id}">Review &amp; Retry</a></p>
