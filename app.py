@@ -4068,6 +4068,36 @@ def admin_verify_document(assignment_id):
     return redirect(url_for('trainees_list'))
 
 
+def _add_timeclock_links(page_html):
+    """Add My Training + Time Clock links next to the My Documents link.
+
+    The trainee documents templates have their own hardcoded menu that is
+    missing the Time Clock link, which strands staff who need to clock in.
+    Rather than editing the template, we inject the links into the rendered
+    HTML right before it is sent to the browser.
+    """
+    try:
+        training_link = '<a href="/training">My Training</a>'
+        clock_link = '<a href="/timeclock">&#9200; Time Clock</a>'
+        if 'href="/timeclock"' in page_html:
+            return page_html  # already has it, nothing to do
+
+        needle = '<a href="/trainee/documents">My Documents</a>'
+        if needle in page_html:
+            replacement = training_link + needle + clock_link
+            return page_html.replace(needle, replacement, 1)
+
+        # fall back: some templates may write the link slightly differently
+        alt = "<a href='/trainee/documents'>My Documents</a>"
+        if alt in page_html:
+            replacement = training_link + alt + clock_link
+            return page_html.replace(alt, replacement, 1)
+
+        return page_html
+    except Exception:
+        return page_html
+
+
 @app.route('/trainee/documents')
 def trainee_documents():
     if not session.get('trainee_id'):
@@ -4084,7 +4114,8 @@ def trainee_documents():
         ORDER BY d.title
     """, (trainee_id,))
     docs = cur.fetchall()
-    return render_template('trainee_documents.html', documents=docs)
+    conn.close()
+    return _add_timeclock_links(render_template('trainee_documents.html', documents=docs))
 
 
 @app.route('/trainee/documents/sign/<int:assignment_id>', methods=['GET', 'POST'])
@@ -4108,7 +4139,7 @@ def trainee_sign_document(assignment_id):
         WHERE td.id=%s
     """, (assignment_id,))
     assignment = cur.fetchone()
-    return render_template('trainee_sign_document.html', assignment=assignment)
+    return _add_timeclock_links(render_template('trainee_sign_document.html', assignment=assignment))
 
 # ── End Document Library Routes ───────────────────────────────────────────────
 
