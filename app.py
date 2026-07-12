@@ -2565,6 +2565,22 @@ def init_crm_db():
             updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         )
     ''')
+    try:
+        cursor.execute('SELECT source FROM leads LIMIT 1')
+    except Exception:
+        try:
+            cursor.execute('ALTER TABLE leads ADD COLUMN source VARCHAR(100)')
+        except Exception:
+            pass
+    try:
+        cursor.execute('''CREATE TABLE IF NOT EXISTS quote_events (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            event VARCHAR(20),
+            source VARCHAR(100),
+            created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )''')
+    except Exception:
+        pass
     conn.commit()
     conn.close()
 
@@ -2825,6 +2841,156 @@ def crm_delete(lead_id):
     return redirect('/crm')
 
 
+QUOTE_BASE = 70.0
+QUOTE_PER_BED = 25.0
+QUOTE_PER_BATH = 35.0
+QUOTE_PER_SQFT = 0.015
+QUOTE_MIN = 150.0
+
+QUOTE_TYPE_MULT = {
+    'standard': 1.00,
+    'deep': 1.43,
+    'moveout': 1.60,
+    'airbnb': 1.00,
+}
+QUOTE_FREQ_MULT = {
+    'weekly': 0.88,
+    'biweekly': 0.94,
+    'monthly': 0.97,
+    'onetime': 1.25,
+}
+QUOTE_TYPE_LABEL = {
+    'standard': 'Standard Clean',
+    'deep': 'Deep Clean',
+    'moveout': 'Move-Out Clean',
+    'airbnb': 'Airbnb Turnover',
+}
+QUOTE_FREQ_LABEL = {
+    'weekly': 'Weekly',
+    'biweekly': 'Every 2 weeks',
+    'monthly': 'Monthly',
+    'onetime': 'One-time only',
+}
+
+
+def compute_quote(cleaning_type, bedrooms, bathrooms, sqft, frequency):
+    """Return (price, label) for a quote configuration."""
+    try:
+        bedrooms = max(0, min(10, int(bedrooms)))
+    except (TypeError, ValueError):
+        bedrooms = 3
+    try:
+        bathrooms = max(0, min(10, int(bathrooms)))
+    except (TypeError, ValueError):
+        bathrooms = 2
+    try:
+        sqft = max(0, min(20000, int(sqft)))
+    except (TypeError, ValueError):
+        sqft = 2000
+
+    ctype = cleaning_type if cleaning_type in QUOTE_TYPE_MULT else 'standard'
+    freq = frequency if frequency in QUOTE_FREQ_MULT else 'onetime'
+
+    base = (QUOTE_BASE
+            + QUOTE_PER_BED * bedrooms
+            + QUOTE_PER_BATH * bathrooms
+            + QUOTE_PER_SQFT * sqft)
+    price = base * QUOTE_TYPE_MULT[ctype]
+
+    # deep and move-out cleans are inherently one-off; no frequency discount
+    if ctype in ('standard', 'airbnb'):
+        price = price * QUOTE_FREQ_MULT[freq]
+
+    if price < QUOTE_MIN:
+        price = QUOTE_MIN
+    return int(round(price)), QUOTE_TYPE_LABEL[ctype]
+
+
+def detect_source():
+    """Where did this visitor come from? utm_source wins, then referrer."""
+    try:
+        utm = (request.args.get('utm_source') or '').strip().lower()
+        if utm:
+            return utm[:100]
+        ref = (request.referrer or '').lower()
+        if not ref:
+            return 'direct'
+        for name in ('facebook', 'instagram', 'google', 'bing', 'nextdoor',
+                     'yelp', 'youtube', 'tiktok', 'twitter', 'linkedin'):
+            if name in ref:
+                return name
+        if 'caseyscleaning' in ref:
+            return 'direct'
+        return ref.split('/')[2][:100] if '//' in ref else 'other'
+    except Exception:
+        return 'unknown'
+
+
+def log_quote_event(event, source):
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("CREATE TABLE IF NOT EXISTS quote_events (id INT AUTO_INCREMENT PRIMARY KEY, event VARCHAR(20), source VARCHAR(100), created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+        cur.execute("INSERT INTO quote_events (event, source) VALUES (%s, %s)", (event, source))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+
+@app.route('/quote/price', methods=['POST'])
+def quote_price():
+    """Capture the lead, then return their price."""
+    import json as _json
+    first_name = (request.form.get('first_name') or '').strip()
+    last_name = (request.form.get('last_name') or '').strip()
+    phone = (request.form.get('phone') or '').strip()
+    email = (request.form.get('email') or '').strip()
+    address = (request.form.get('address') or '').strip()
+    notes = (request.form.get('notes') or '').strip()
+
+    cleaning_type = request.form.get('cleaning_type', 'standard')
+    frequency = request.form.get('frequency', 'onetime')
+    bedrooms = request.form.get('bedrooms', '3')
+    bathrooms = request.form.get('bathrooms', '2')
+    sqft = request.form.get('sqft', '2000')
+    source = (request.form.get('source') or 'unknown').strip()[:100]
+
+    if not first_name or not phone:
+        return {'ok': False, 'error': 'Name and phone are required.'}, 400
+
+    price, type_label = compute_quote(cleaning_type, bedrooms, bathrooms, sqft, frequency)
+    freq_label = QUOTE_FREQ_LABEL.get(frequency, 'One-time only')
+
+    full_notes = "[Quote] %s | %s | Beds: %s | Baths: %s | SqFt: %s | Estimate: $%s" % (
+        type_label, freq_label, bedrooms, bathrooms, sqft, price)
+    if address:
+        full_notes += " | Address: " + address
+    if notes:
+        full_notes += " | Notes: " + notes
+
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                "INSERT INTO leads (first_name, last_name, phone, email, address, service_type, status, notes, source) VALUES (%s,%s,%s,%s,%s,%s,'new',%s,%s)",
+                (first_name, last_name, phone, email, address, cleaning_type, full_notes, source))
+        except Exception:
+            cursor.execute(
+                "INSERT INTO leads (first_name, last_name, phone, email, address, service_type, status, notes) VALUES (%s,%s,%s,%s,%s,%s,'new',%s)",
+                (first_name, last_name, phone, email, address, cleaning_type, full_notes))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+    log_quote_event('lead', source)
+
+    return {'ok': True, 'price': price, 'type_label': type_label,
+            'freq_label': freq_label, 'name': first_name}
+
+
 @app.route('/quote', methods=['GET', 'POST'])
 def quote_request():
     if request.method == 'POST':
@@ -2883,7 +3049,237 @@ def quote_request():
     except Exception:
         pass
 
-    return render_template('quote.html')
+    source = detect_source()
+    log_quote_event('view', source)
+    return render_quote_page(source)
+
+
+def render_quote_page(source):
+    return """<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Get Your Free Quote &mdash; Casey's Cleaning</title>
+<style>
+ *{box-sizing:border-box;}
+ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+      background:#faf7f4;color:#2f2a26;}
+ .hero{background:#6b4a2f;color:#fff;padding:38px 20px 30px;text-align:center;}
+ .hero h1{margin:0 0 8px;font-size:28px;}
+ .hero p{margin:0;opacity:.9;font-size:15px;}
+ .wrap{max-width:640px;margin:-18px auto 40px;padding:0 16px;}
+ .card{background:#fff;border:1px solid #e8e0d8;border-radius:12px;
+       padding:20px;margin-bottom:16px;}
+ .card h2{margin:0 0 4px;font-size:17px;}
+ .card .sub{margin:0 0 14px;color:#8a7f76;font-size:13px;}
+ .opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;}
+ .opt{border:2px solid #e8e0d8;border-radius:10px;padding:12px;text-align:center;
+      cursor:pointer;background:#fff;transition:.15s;}
+ .opt:hover{border-color:#c9a227;}
+ .opt.sel{border-color:#b5651d;background:#fdf6ee;}
+ .opt b{display:block;font-size:14px;margin-bottom:2px;}
+ .opt span{font-size:12px;color:#8a7f76;}
+ .row{display:flex;align-items:center;gap:12px;margin-bottom:14px;}
+ .row label{flex:0 0 120px;font-size:14px;color:#6b6259;}
+ .row input[type=range]{flex:1;}
+ .val{flex:0 0 62px;text-align:right;font-weight:600;font-size:14px;}
+ .fld{margin-bottom:12px;}
+ .fld label{display:block;font-size:13px;color:#6b6259;margin-bottom:4px;}
+ .fld input,.fld textarea{width:100%;padding:11px;border:1px solid #d8cfc5;
+      border-radius:8px;font-size:15px;font-family:inherit;}
+ .two{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+ .btn{width:100%;background:#b5651d;color:#fff;border:0;border-radius:10px;
+      padding:15px;font-size:16px;font-weight:600;cursor:pointer;}
+ .btn:hover{background:#9c5518;}
+ .btn:disabled{background:#c9bcb0;cursor:not-allowed;}
+ .locked{text-align:center;padding:22px;background:#fdf6ee;border:2px dashed #e0cdb4;
+      border-radius:10px;color:#8a7f76;font-size:14px;}
+ .price{text-align:center;padding:8px 0 4px;}
+ .price .amt{font-size:46px;font-weight:700;color:#b5651d;line-height:1;}
+ .range{text-align:center;font-size:34px;font-weight:700;color:#6b4a2f;line-height:1.1;}
+ .price .lbl{color:#8a7f76;font-size:14px;margin-top:6px;}
+ .err{color:#b3261e;font-size:13px;margin-top:8px;display:none;}
+ .note{font-size:12px;color:#9a8f85;text-align:center;margin-top:10px;}
+ .hidden{display:none;}
+</style></head><body>
+<div class="hero">
+  <h1>Get Your Free Instant Quote</h1>
+  <p>Tell us about your home &mdash; get your price in seconds.</p>
+</div>
+<div class="wrap">
+
+  <div class="card">
+    <h2>Type of cleaning</h2>
+    <p class="sub">Pick what fits your needs</p>
+    <div class="opts" id="types">
+      <div class="opt sel" data-v="standard"><b>Standard</b><span>Regular upkeep</span></div>
+      <div class="opt" data-v="deep"><b>Deep Clean</b><span>Top to bottom</span></div>
+      <div class="opt" data-v="moveout"><b>Move-Out</b><span>Ready for new</span></div>
+      <div class="opt" data-v="airbnb"><b>Airbnb</b><span>Rental turnover</span></div>
+    </div>
+  </div>
+
+  <div class="card" id="freqcard">
+    <h2>How often?</h2>
+    <p class="sub">Recurring service saves you money</p>
+    <div class="opts" id="freqs">
+      <div class="opt" data-v="weekly"><b>Weekly</b><span>Best value</span></div>
+      <div class="opt sel" data-v="biweekly"><b>Every 2 weeks</b><span>Most popular</span></div>
+      <div class="opt" data-v="monthly"><b>Monthly</b><span>Light upkeep</span></div>
+      <div class="opt" data-v="onetime"><b>One-time</b><span>Just once</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Home size</h2>
+    <p class="sub">Adjust to match your home</p>
+    <div class="row"><label>Bedrooms</label>
+      <input type="range" id="bed" min="0" max="7" step="1" value="3">
+      <div class="val" id="bedv">3</div></div>
+    <div class="row"><label>Bathrooms</label>
+      <input type="range" id="bath" min="1" max="6" step="1" value="2">
+      <div class="val" id="bathv">2</div></div>
+    <div class="row"><label>Square feet</label>
+      <input type="range" id="sqft" min="500" max="6000" step="100" value="2000">
+      <div class="val" id="sqftv">2000</div></div>
+  </div>
+
+  <div class="card" id="rangecard">
+    <p class="sub" style="text-align:center;margin:0 0 6px;">Your estimated price</p>
+    <div class="range" id="range">$210 &ndash; $250</div>
+    <p class="note" id="rangenote">Estimate updates as you adjust your home above.</p>
+  </div>
+
+  <div class="card" id="gate">
+    <h2>Lock in your exact price</h2>
+    <p class="sub">Enter your details to see your exact quote and book your clean.</p>
+    <div class="two">
+      <div class="fld"><label>First name *</label><input id="fn" required></div>
+      <div class="fld"><label>Last name</label><input id="ln"></div>
+    </div>
+    <div class="two">
+      <div class="fld"><label>Phone *</label><input id="ph" type="tel" required></div>
+      <div class="fld"><label>Email *</label><input id="em" type="email" required></div>
+    </div>
+    <div class="fld"><label>Address (optional)</label><input id="ad"></div>
+    <button class="btn" id="go">Get My Exact Price</button>
+    <div class="err" id="err"></div>
+    <p class="note">No obligation. We'll never share your information.</p>
+  </div>
+
+  <div class="card hidden" id="result">
+    <div class="price">
+      <div class="amt" id="amt">$0</div>
+      <div class="lbl" id="lbl"></div>
+    </div>
+    <p class="note" id="thanks"></p>
+  </div>
+
+</div>
+<script>
+var SOURCE = "__SOURCE__";
+var state = {type:'standard', freq:'biweekly'};
+
+function pick(boxId, key){
+  var box = document.getElementById(boxId);
+  box.addEventListener('click', function(e){
+    var t = e.target.closest('.opt');
+    if(!t) return;
+    box.querySelectorAll('.opt').forEach(function(o){o.classList.remove('sel');});
+    t.classList.add('sel');
+    state[key] = t.getAttribute('data-v');
+    toggleFreq();
+    estimate();
+  });
+}
+pick('types','type');
+pick('freqs','freq');
+
+function toggleFreq(){
+  var fc = document.getElementById('freqcard');
+  if(state.type === 'deep' || state.type === 'moveout'){ fc.classList.add('hidden'); }
+  else { fc.classList.remove('hidden'); }
+}
+toggleFreq();
+
+var TYPE_MULT = {standard:1.00, deep:1.43, moveout:1.60, airbnb:1.00};
+var FREQ_MULT = {weekly:0.88, biweekly:0.94, monthly:0.97, onetime:1.25};
+
+function estimate(){
+  var bed  = +document.getElementById('bed').value;
+  var bath = +document.getElementById('bath').value;
+  var sqft = +document.getElementById('sqft').value;
+  var p = 70 + 25*bed + 35*bath + 0.015*sqft;
+  p = p * (TYPE_MULT[state.type] || 1);
+  if(state.type === 'standard' || state.type === 'airbnb'){
+    p = p * (FREQ_MULT[state.freq] || 1);
+  }
+  if(p < 150) p = 150;
+  var lo = Math.floor((p * 0.92) / 5) * 5;
+  var hi = Math.ceil((p * 1.09) / 5) * 5;
+  document.getElementById('range').innerHTML = '$' + lo + ' &ndash; $' + hi;
+}
+
+['bed','bath','sqft'].forEach(function(id){
+  var el = document.getElementById(id);
+  el.addEventListener('input', function(){
+    document.getElementById(id+'v').textContent = el.value;
+    estimate();
+  });
+});
+
+estimate();
+
+document.getElementById('go').addEventListener('click', function(){
+  var fn = document.getElementById('fn').value.trim();
+  var ph = document.getElementById('ph').value.trim();
+  var em = document.getElementById('em').value.trim();
+  var err = document.getElementById('err');
+  if(!fn || !ph || !em){
+    err.textContent = 'Please enter your name, phone, and email.';
+    err.style.display = 'block';
+    return;
+  }
+  err.style.display = 'none';
+  var btn = this;
+  btn.disabled = true; btn.textContent = 'Getting your price...';
+
+  var d = new FormData();
+  d.append('first_name', fn);
+  d.append('last_name', document.getElementById('ln').value.trim());
+  d.append('phone', ph);
+  d.append('email', em);
+  d.append('address', document.getElementById('ad').value.trim());
+  d.append('cleaning_type', state.type);
+  d.append('frequency', state.freq);
+  d.append('bedrooms', document.getElementById('bed').value);
+  d.append('bathrooms', document.getElementById('bath').value);
+  d.append('sqft', document.getElementById('sqft').value);
+  d.append('source', SOURCE);
+
+  fetch('/quote/price', {method:'POST', body:d})
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if(!j.ok){ throw new Error(j.error || 'error'); }
+      document.getElementById('gate').classList.add('hidden');
+      document.getElementById('rangecard').classList.add('hidden');
+      var res = document.getElementById('result');
+      res.classList.remove('hidden');
+      document.getElementById('amt').textContent = '$' + j.price;
+      var lbl = j.type_label;
+      if(state.type === 'standard' || state.type === 'airbnb'){ lbl += ' \u00b7 ' + j.freq_label; }
+      document.getElementById('lbl').textContent = lbl;
+      document.getElementById('thanks').textContent =
+        'Thanks ' + j.name + '! We have your details and will call shortly to confirm and schedule.';
+      res.scrollIntoView({behavior:'smooth'});
+    })
+    .catch(function(){
+      btn.disabled = false; btn.textContent = 'Get My Exact Price';
+      err.textContent = 'Something went wrong. Please call us at (702) 506-8918.';
+      err.style.display = 'block';
+    });
+});
+</script>
+</body></html>""".replace("__SOURCE__", source)
 
 
 @app.route('/customers')
