@@ -2613,6 +2613,46 @@ def status_badge(status):
     return f'<span style="background:{color};color:white;padding:3px 10px;border-radius:4px;font-size:12px;font-weight:bold;">{label}</span>'
 
 
+def _source_funnel_html():
+    """Views vs leads per source, so you can see which ads actually work."""
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("CREATE TABLE IF NOT EXISTS quote_events (id INT AUTO_INCREMENT PRIMARY KEY, event VARCHAR(20), source VARCHAR(100), created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+        conn.commit()
+        cur.execute("SELECT source, event, COUNT(*) AS n FROM quote_events GROUP BY source, event")
+        rows = cur.fetchall()
+        conn.close()
+    except Exception:
+        return ''
+
+    if not rows:
+        return ('<div class="application"><h3>Lead Sources</h3>'
+                '<p class="form-note">No quote traffic recorded yet. Add '
+                '<code>?utm_source=facebook</code> to your ad links to start tracking.</p></div>')
+
+    data = {}
+    for r in rows:
+        s = r['source'] or 'unknown'
+        data.setdefault(s, {'view': 0, 'lead': 0})
+        data[s][r['event']] = r['n']
+
+    body = ''
+    for s in sorted(data, key=lambda k: -data[k]['view']):
+        v = data[s]['view']
+        l = data[s]['lead']
+        rate = ('%d%%' % round(l * 100.0 / v)) if v else '-'
+        body += ('<tr><td>%s</td><td>%d</td><td>%d</td><td><strong>%s</strong></td></tr>'
+                 % (s, v, l, rate))
+
+    return ('<div class="application"><h3>Lead Sources</h3>'
+            '<table style="width:100%;border-collapse:collapse;" border="1" cellpadding="6">'
+            '<tr><th align="left">Source</th><th align="left">Quote views</th>'
+            '<th align="left">Leads</th><th align="left">Convert</th></tr>'
+            + body + '</table>'
+            '<p class="form-note">Tag your ads: caseyscleaning.net/quote?utm_source=facebook</p></div>')
+
+
 @app.route('/crm')
 @login_required
 def crm_list():
@@ -2645,6 +2685,7 @@ def crm_list():
     html = STYLE + admin_nav() + '<h1>CRM - Leads</h1>'
     html += filter_links
     html += '<p><a class="btn btn-success" href="/crm/new">+ Add Lead</a></p>'
+    html += _source_funnel_html()
 
     if not leads:
         html += '<div class="info"><p>No leads yet. Add one manually or share your quote request link with customers: <strong>/quote</strong></p></div>'
@@ -2675,9 +2716,21 @@ def crm_list():
 
             notes_html = f'<p><strong>Notes:</strong> {notes_clean}</p>' if notes_clean else ''
 
+            _src = None
+            try:
+                _src = lead["source"]
+            except Exception:
+                _src = None
+            if _src:
+                _sc = {'facebook': '#3b5998', 'instagram': '#c13584', 'google': '#0f9d58',
+                       'nextdoor': '#8ed500', 'direct': '#6b6259'}.get(str(_src).split('_')[0].lower(), '#b5651d')
+                source_badge = f'<span style="background:{_sc};color:#fff;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:600;margin-left:6px;">{_src}</span>'
+            else:
+                source_badge = ''
+
             html += f'''
             <div class="application">
-                <h2>{lead["first_name"]} {lead["last_name"]} {status_badge(lead["status"])}</h2>
+                <h2>{lead["first_name"]} {lead["last_name"]} {status_badge(lead["status"])} {source_badge}</h2>
                 <p><strong>Service:</strong> {lead["service_type"] or "Not specified"} &nbsp;|&nbsp;
                    <strong>Phone:</strong> {lead["phone"] or "N/A"} &nbsp;|&nbsp;
                    <strong>Email:</strong> {lead["email"] or "N/A"}</p>
@@ -3063,6 +3116,15 @@ def render_quote_page(source):
  *{box-sizing:border-box;}
  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
       background:#faf7f4;color:#2f2a26;}
+ .topnav{background:#5a3d26;padding:12px 20px;display:flex;align-items:center;
+      justify-content:space-between;flex-wrap:wrap;gap:8px;}
+ .topnav .brand{color:#fff;font-weight:700;font-size:18px;text-decoration:none;}
+ .topnav .brand span{color:#e8b84b;}
+ .topnav .navlinks a{color:#f0e6dc;text-decoration:none;font-size:14px;margin-left:18px;}
+ .topnav .navlinks a:hover{color:#fff;text-decoration:underline;}
+ .backlink{text-align:center;margin-top:18px;}
+ .backlink a{color:#8a7f76;font-size:14px;text-decoration:none;}
+ .backlink a:hover{color:#b5651d;text-decoration:underline;}
  .hero{background:#6b4a2f;color:#fff;padding:38px 20px 30px;text-align:center;}
  .hero h1{margin:0 0 8px;font-size:28px;}
  .hero p{margin:0;opacity:.9;font-size:15px;}
@@ -3101,6 +3163,13 @@ def render_quote_page(source):
  .note{font-size:12px;color:#9a8f85;text-align:center;margin-top:10px;}
  .hidden{display:none;}
 </style></head><body>
+<div class="topnav">
+  <a class="brand" href="/">Casey's <span>Cleaning</span></a>
+  <div class="navlinks">
+    <a href="/">Home</a>
+    <a href="/jobs">View Jobs</a>
+  </div>
+</div>
 <div class="hero">
   <h1>Get Your Free Instant Quote</h1>
   <p>Tell us about your home &mdash; get your price in seconds.</p>
@@ -3173,6 +3242,8 @@ def render_quote_page(source):
     </div>
     <p class="note" id="thanks"></p>
   </div>
+
+  <div class="backlink"><a href="/">&larr; Back to Casey's Cleaning</a></div>
 
 </div>
 <script>
