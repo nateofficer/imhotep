@@ -948,15 +948,52 @@ def dashboard():
             <!-- Advertise -->
             <div class="dash-card">
                 <h2>Advertise</h2>
-                <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;">
-                    <a class="btn" href="https://www.facebook.com/adsmanager/manage/campaigns" target="_blank" rel="noopener noreferrer" style="background:#1877F2;">Facebook</a>
-                    <a class="btn" href="https://www.instagram.com/" target="_blank" rel="noopener noreferrer" style="background:#C13584;">Instagram</a>
-                    <a class="btn" href="https://ads.tiktok.com/" target="_blank" rel="noopener noreferrer" style="background:#010101;">TikTok</a>
-                    <a class="btn" href="https://ads.snapchat.com/" target="_blank" rel="noopener noreferrer" style="background:#FFFC00;color:#111;">Snapchat</a>
-                    <a class="btn" href="https://www.craigslist.org/" target="_blank" rel="noopener noreferrer" style="background:#5C3D2E;">Craigslist</a>
-                        <a class="btn" href="https://teams.microsoft.com" target="_blank" rel="noopener noreferrer" style="background:#6264A7;">Teams</a>
-                </div>
+                <p class="form-note" style="margin:4px 0 12px;">Click <strong>Copy link</strong>, then paste it into that ad or post. Every lead from it gets tagged with its source in your CRM.</p>
+
+                <div class="ad-row"><a class="btn" href="https://ads.google.com/" target="_blank" rel="noopener noreferrer" style="background:#4285F4;">Google Ads</a><button class="btn copy-src" data-src="google_ads" style="background:#e9e4de;color:#3a332c;">Copy link</button><span class="ad-tip">Highest intent &mdash; people searching for a cleaner right now</span></div>
+
+                <div class="ad-row"><a class="btn" href="https://www.facebook.com/adsmanager/manage/campaigns" target="_blank" rel="noopener noreferrer" style="background:#1877F2;">Facebook</a><button class="btn copy-src" data-src="facebook" style="background:#e9e4de;color:#3a332c;">Copy link</button><span class="ad-tip">Proven for you &mdash; keep it</span></div>
+
+                <div class="ad-row"><a class="btn" href="https://lasvegas.craigslist.org/" target="_blank" rel="noopener noreferrer" style="background:#5C3D2E;">Craigslist</a><button class="btn copy-src" data-src="craigslist" style="background:#e9e4de;color:#3a332c;">Copy link</button><span class="ad-tip">Proven for you &mdash; keep it</span></div>
+
+                <div class="ad-row"><a class="btn" href="https://business.nextdoor.com/" target="_blank" rel="noopener noreferrer" style="background:#8ED500;color:#123;">Nextdoor</a><button class="btn copy-src" data-src="nextdoor" style="background:#e9e4de;color:#3a332c;">Copy link</button><span class="ad-tip">Free &mdash; best channel for residential cleaning</span></div>
+
+                <div class="ad-row"><a class="btn" href="https://www.thumbtack.com/pro/" target="_blank" rel="noopener noreferrer" style="background:#009FD9;">Thumbtack</a><button class="btn copy-src" data-src="thumbtack" style="background:#e9e4de;color:#3a332c;">Copy link</button><span class="ad-tip">Pay per lead &mdash; worth a test</span></div>
+
+                <div class="ad-row"><a class="btn" href="https://www.instagram.com/" target="_blank" rel="noopener noreferrer" style="background:#C13584;">Instagram</a><button class="btn copy-src" data-src="instagram" style="background:#e9e4de;color:#3a332c;">Copy link</button><span class="ad-tip">Post before/after photos</span></div>
+
+                <div class="ad-row"><a class="btn" href="https://biz.yelp.com/" target="_blank" rel="noopener noreferrer" style="background:#D32323;">Yelp</a><button class="btn copy-src" data-src="yelp" style="background:#e9e4de;color:#3a332c;">Copy link</button><span class="ad-tip">Claim the free listing; skip the paid ads</span></div>
+
+                <div class="ad-row"><a class="btn" href="https://ads.tiktok.com/" target="_blank" rel="noopener noreferrer" style="background:#010101;">TikTok</a><button class="btn copy-src" data-src="tiktok" style="background:#e9e4de;color:#3a332c;">Copy link</button><span class="ad-tip">Better for hiring than for customers</span></div>
+
+                <div class="ad-row"><a class="btn" href="https://teams.microsoft.com" target="_blank" rel="noopener noreferrer" style="background:#6264A7;">Teams</a><span class="ad-tip">Team communication</span></div>
+
+                <p class="form-note" id="copied-msg" style="display:none;color:#1d9e75;font-weight:600;margin-top:10px;">Link copied &mdash; paste it into your ad.</p>
             </div>
+            <style>
+              .ad-row{{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;}}
+              .ad-row .btn{{min-width:110px;text-align:center;}}
+              .ad-tip{{font-size:12px;color:#8a7f76;}}
+            </style>
+            <script>
+            document.addEventListener('click', function(e){{
+              var b = e.target.closest('.copy-src');
+              if(!b) return;
+              var url = window.location.origin + '/quote?utm_source=' + b.getAttribute('data-src');
+              var done = function(){{
+                var m = document.getElementById('copied-msg');
+                m.textContent = 'Copied: ' + url;
+                m.style.display = 'block';
+                b.textContent = 'Copied!';
+                setTimeout(function(){{ b.textContent = 'Copy link'; }}, 1800);
+              }};
+              if(navigator.clipboard && navigator.clipboard.writeText){{
+                navigator.clipboard.writeText(url).then(done, function(){{ window.prompt('Copy this link:', url); }});
+              }} else {{
+                window.prompt('Copy this link:', url);
+              }}
+            }});
+            </script>
 
         </div>
     </div>
