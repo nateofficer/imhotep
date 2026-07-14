@@ -360,7 +360,7 @@
 <div class="hero">
   <div class="hero-icon">🧹</div>
   <h1>Get Your Free Instant Quote</h1>
-  <p>Adjust the options below to see your estimated price. We'll confirm the final rate after our on-site walkthrough.</p>
+  <p>Tell us about your home and we'll email you a free quote &mdash; no cost, no obligation.</p>
 </div>
 
 <div class="main">
@@ -515,8 +515,8 @@
     </div>
   </div>
 
-  <!-- ESTIMATE -->
-  <div class="estimate-box">
+  <!-- ESTIMATE (hidden -- price is emailed, not shown) -->
+  <div class="estimate-box" style="display:none;">
     <div class="estimate-left">
       <div class="estimate-label">Your Estimated Price</div>
       <div class="estimate-amount" id="estimateAmt">$215</div>
@@ -525,8 +525,8 @@
     <div class="estimate-icon">💰</div>
   </div>
 
-  <!-- DISCLAIMER -->
-  <div class="disclaimer">
+  <!-- DISCLAIMER (hidden -- this note now goes out with the emailed quote) -->
+  <div class="disclaimer" style="display:none;">
     <span class="disclaimer-icon">ℹ️</span>
     <span>These are estimated prices based on the information provided. The final price will be confirmed by Casey's Cleaning Company after an on-site walkthrough. Pricing may vary based on home condition, square footage, and specific requirements.</span>
   </div>
@@ -536,15 +536,15 @@
     <div class="card-header">
       <div class="card-icon terra">📋</div>
       <div>
-        <div class="card-title">Your Contact Information</div>
-        <div class="card-subtitle">We'll reach out within 24 hours to confirm</div>
+        <div class="card-title">You're All Set &mdash; Nice Work!</div>
+        <div class="card-subtitle">Pop in your email and your free quote is on its way</div>
       </div>
     </div>
     <div class="card-body">
 
       <!-- Summary of selections -->
       <div class="summary-line" id="summaryLine">
-        <strong>Standard Clean</strong> · 3 bed / 2 bath · Estimated <strong id="summaryAmt">$215</strong>
+        <strong>Standard Clean</strong> · 3 bed / 2 bath
       </div>
 
       <form method="POST" action="/quote" id="quoteForm" enctype="multipart/form-data">
@@ -570,8 +570,8 @@
             <input type="tel" name="phone" required placeholder="(702) 555-0000">
           </div>
           <div class="form-group">
-            <label>Email</label>
-            <input type="email" name="email" placeholder="you@email.com">
+            <label>Email <span class="required">*</span></label>
+            <input type="email" name="email" required placeholder="you@email.com">
           </div>
           <div class="form-group span2">
             <label>Service Address <span class="required">*</span></label>
@@ -592,8 +592,8 @@
     <input type="file" name="photo_2" accept="image/*" style="display:block;margin-bottom:8px;">
     <input type="file" name="photo_3" accept="image/*" style="display:block;margin-bottom:8px;">
 </div>
-<button type="submit" class="btn-submit">Request My Quote →</button>
-          <div class="submit-note">We'll call or text within 24 hours.<br>No obligation to book.</div>
+<button type="submit" class="btn-submit">Email Me My Free Quote →</button>
+          <div class="submit-note">Your free quote lands in your inbox.<br>No cost. No obligation.</div>
         </div>
       </form>
     </div>
@@ -672,7 +672,7 @@
                    : 'Standard Clean';
     const note = TYPE_NOTES[currentType] || '';
     document.getElementById('summaryLine').innerHTML =
-      `<strong>${typeName}</strong> · ${beds === 0 ? 'Studio' : beds + ' bed'} / ${baths} bath${note} · Estimated <strong id="summaryAmt">$${total}</strong>`;
+      `<strong>${typeName}</strong> · ${beds === 0 ? 'Studio' : beds + ' bed'} / ${baths} bath${note}`;
   }
 
   // Init
