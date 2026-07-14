@@ -3046,8 +3046,8 @@ def quote_price():
     sqft = request.form.get('sqft', '2000')
     source = (request.form.get('source') or 'unknown').strip()[:100]
 
-    if not first_name or not phone:
-        return {'ok': False, 'error': 'Name and phone are required.'}, 400
+    if not first_name or not email:
+        return {'ok': False, 'error': 'Name and email are required.'}, 400
 
     price, type_label = compute_quote(cleaning_type, bedrooms, bathrooms, sqft, frequency)
     freq_label = QUOTE_FREQ_LABEL.get(frequency, 'One-time only')
@@ -3260,12 +3260,11 @@ def render_quote_page(source):
     <p class="sub">Just pop in your email and your free quote is on its way. No cost, no obligation.</p>
     <div class="two">
       <div class="fld"><label>First name *</label><input id="fn" required></div>
-      <div class="fld"><label>Last name</label><input id="ln"></div>
-    </div>
-    <div class="two">
-      <div class="fld"><label>Phone *</label><input id="ph" type="tel" required></div>
       <div class="fld"><label>Email *</label><input id="em" type="email" required></div>
     </div>
+    <!-- kept in the DOM so the JS still works; submitted empty -->
+    <div class="fld hidden"><label>Last name</label><input id="ln"></div>
+    <div class="fld hidden"><label>Phone</label><input id="ph" type="tel"></div>
     <div class="fld"><label>Address (optional)</label><input id="ad"></div>
     <button class="btn" id="go">Email Me My Free Quote</button>
     <div class="err" id="err"></div>
@@ -3342,8 +3341,8 @@ document.getElementById('go').addEventListener('click', function(){
   var ph = document.getElementById('ph').value.trim();
   var em = document.getElementById('em').value.trim();
   var err = document.getElementById('err');
-  if(!fn || !ph || !em){
-    err.textContent = 'Please enter your name, phone, and email.';
+  if(!fn || !em){
+    err.textContent = 'Please enter your name and email.';
     err.style.display = 'block';
     return;
   }
