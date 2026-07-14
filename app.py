@@ -3209,7 +3209,7 @@ def render_quote_page(source):
 </div>
 <div class="hero">
   <h1>Get Your Free Instant Quote</h1>
-  <p>Tell us about your home &mdash; get your price in seconds.</p>
+  <p>Tell us about your home &mdash; we&rsquo;ll email you a free quote.</p>
 </div>
 <div class="wrap">
 
@@ -3249,15 +3249,15 @@ def render_quote_page(source):
       <div class="val" id="sqftv">2000</div></div>
   </div>
 
-  <div class="card" id="rangecard">
+  <div class="card hidden" id="rangecard">
     <p class="sub" style="text-align:center;margin:0 0 6px;">Your estimated price</p>
     <div class="range" id="range">$210 &ndash; $250</div>
     <p class="note" id="rangenote">Estimate updates as you adjust your home above.</p>
   </div>
 
   <div class="card" id="gate">
-    <h2>Lock in your exact price</h2>
-    <p class="sub">Enter your details to see your exact quote and book your clean.</p>
+    <h2>You&rsquo;re all set &mdash; nice work!</h2>
+    <p class="sub">Just pop in your email and your free quote is on its way. No cost, no obligation.</p>
     <div class="two">
       <div class="fld"><label>First name *</label><input id="fn" required></div>
       <div class="fld"><label>Last name</label><input id="ln"></div>
@@ -3267,13 +3267,13 @@ def render_quote_page(source):
       <div class="fld"><label>Email *</label><input id="em" type="email" required></div>
     </div>
     <div class="fld"><label>Address (optional)</label><input id="ad"></div>
-    <button class="btn" id="go">Get My Exact Price</button>
+    <button class="btn" id="go">Email Me My Free Quote</button>
     <div class="err" id="err"></div>
     <p class="note">No obligation. We'll never share your information.</p>
   </div>
 
   <div class="card hidden" id="result">
-    <div class="price">
+    <div class="price hidden">
       <div class="amt" id="amt">$0</div>
       <div class="lbl" id="lbl"></div>
     </div>
@@ -3349,7 +3349,7 @@ document.getElementById('go').addEventListener('click', function(){
   }
   err.style.display = 'none';
   var btn = this;
-  btn.disabled = true; btn.textContent = 'Getting your price...';
+  btn.disabled = true; btn.textContent = 'Sending your quote...';
 
   var d = new FormData();
   d.append('first_name', fn);
@@ -3377,11 +3377,11 @@ document.getElementById('go').addEventListener('click', function(){
       if(state.type === 'standard' || state.type === 'airbnb'){ lbl += ' \u00b7 ' + j.freq_label; }
       document.getElementById('lbl').textContent = lbl;
       document.getElementById('thanks').textContent =
-        'Thanks ' + j.name + '! We have your details and will call shortly to confirm and schedule.';
+        'Thanks ' + j.name + '! Your free quote is on its way to your inbox. We\'ll confirm the final price after a quick walkthrough, so you only pay for what your home actually needs.';
       res.scrollIntoView({behavior:'smooth'});
     })
     .catch(function(){
-      btn.disabled = false; btn.textContent = 'Get My Exact Price';
+      btn.disabled = false; btn.textContent = 'Email Me My Free Quote';
       err.textContent = 'Something went wrong. Please call us at (702) 506-8918.';
       err.style.display = 'block';
     });
