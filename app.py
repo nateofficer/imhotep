@@ -487,7 +487,7 @@ def home():
         background: linear-gradient(135deg,#2c3e50 0%,#3d5a73 100%);
         color:#fff; text-align:center; padding: 44px 22px 38px;
     }
-    .lp-hero h1 { font-size: 30px; line-height:1.2; margin:0 0 10px; }
+    .lp-hero h1 { font-size: 30px; line-height:1.2; margin:0 0 10px; color:#ffffff; text-shadow:0 1px 3px rgba(0,0,0,.35); }
     .lp-hero .tag { font-size:17px; opacity:.92; margin:0 0 22px; }
     .lp-cta {
         display:inline-block; background:#e67e22; color:#fff;
@@ -506,7 +506,7 @@ def home():
         padding:7px 13px; border-radius:20px;
     }
     .lp-photos {
-        display:grid; grid-template-columns:1fr; gap:12px;
+        display:none; grid-template-columns:1fr; gap:12px;
         max-width:640px; margin:26px auto; padding:0 16px;
     }
     @media (min-width:600px){ .lp-photos { grid-template-columns:1fr 1fr 1fr; } }
