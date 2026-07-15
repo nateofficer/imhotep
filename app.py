@@ -3458,7 +3458,7 @@ document.getElementById('go').addEventListener('click', function(){
       if(state.type === 'standard' || state.type === 'airbnb'){ lbl += ' \u00b7 ' + j.freq_label; }
       document.getElementById('lbl').textContent = lbl;
       document.getElementById('thanks').textContent =
-        'Thanks ' + j.name + '! Your free quote is on its way to your inbox. We\'ll confirm the final price after a quick walkthrough, so you only pay for what your home actually needs.';
+        'Thanks ' + j.name + '! Your free quote is on its way to your inbox. We\\'ll confirm the final price after a quick walkthrough, so you only pay for what your home actually needs.';
       res.scrollIntoView({behavior:'smooth'});
     })
     .catch(function(){
