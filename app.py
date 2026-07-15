@@ -479,35 +479,117 @@ def home():
         top_nav = ''
 
     html = STYLE + top_nav + '''
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-    .hero { text-align:center; padding: 60px 20px 30px; }
-    .hero h1 { font-size: 34px; color:#2c3e50; margin-bottom: 10px; }
-    .hero p { color:#555; font-size:16px; margin-bottom: 28px; }
-    .quote-btn-large { display:inline-block; background:#3498db; color:#fff; font-size:20px; font-weight:bold; padding:18px 50px; border-radius:8px; text-decoration:none; }
-    .quote-btn-large:hover { background:#2980b9; }
-    .about { max-width:680px; margin: 0 auto 50px; text-align:center; color:#444; line-height:1.7; padding: 0 20px; }
-    .footer-nav { text-align:center; padding:24px; border-top:1px solid #eee; }
-    .footer-nav a { font-size:13px; color:#888; margin:0 14px; text-decoration:none; }
-    .footer-nav a:hover { color:#3498db; text-decoration:underline; }
+    * { box-sizing: border-box; }
+    .lp { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; color:#222; }
+    .lp-hero {
+        background: linear-gradient(135deg,#2c3e50 0%,#3d5a73 100%);
+        color:#fff; text-align:center; padding: 44px 22px 38px;
+    }
+    .lp-hero h1 { font-size: 30px; line-height:1.2; margin:0 0 10px; }
+    .lp-hero .tag { font-size:17px; opacity:.92; margin:0 0 22px; }
+    .lp-cta {
+        display:inline-block; background:#e67e22; color:#fff;
+        font-size:19px; font-weight:800; padding:16px 40px;
+        border-radius:10px; text-decoration:none;
+        box-shadow:0 4px 14px rgba(0,0,0,.25);
+    }
+    .lp-cta:hover { background:#d35400; }
+    .lp-trust {
+        display:flex; flex-wrap:wrap; justify-content:center; gap:10px;
+        background:#f4efe9; padding:16px 12px; margin:0;
+    }
+    .lp-trust span {
+        font-size:13px; font-weight:700; color:#5C3D2E;
+        background:#fff; border:1px solid #e2d6cc;
+        padding:7px 13px; border-radius:20px;
+    }
+    .lp-photos {
+        display:grid; grid-template-columns:1fr; gap:12px;
+        max-width:640px; margin:26px auto; padding:0 16px;
+    }
+    @media (min-width:600px){ .lp-photos { grid-template-columns:1fr 1fr 1fr; } }
+    .lp-photo {
+        aspect-ratio:4/3; border-radius:12px; overflow:hidden;
+        background:#ddd; box-shadow:0 2px 10px rgba(0,0,0,.12);
+    }
+    .lp-photo img { width:100%; height:100%; object-fit:cover; display:block; }
+    .lp-ph {
+        width:100%; height:100%; display:flex; align-items:center;
+        justify-content:center; color:#888; font-size:13px; font-weight:700;
+        background:repeating-linear-gradient(45deg,#e9e4de,#e9e4de 12px,#f2eee9 12px,#f2eee9 24px);
+        text-align:center; padding:10px;
+    }
+    .lp-services {
+        display:flex; flex-wrap:wrap; justify-content:center; gap:10px;
+        max-width:640px; margin:0 auto 30px; padding:0 16px;
+    }
+    .lp-svc {
+        flex:1 1 130px; background:#fff; border:1px solid #eee;
+        border-radius:10px; padding:16px 12px; text-align:center;
+        box-shadow:0 1px 6px rgba(0,0,0,.06);
+    }
+    .lp-svc b { display:block; color:#2c3e50; font-size:15px; margin-bottom:3px; }
+    .lp-svc span { font-size:12px; color:#777; }
+    .lp-about {
+        max-width:620px; margin:0 auto 34px; text-align:center;
+        color:#444; line-height:1.7; padding:0 22px; font-size:15px;
+    }
+    .lp-bottom { text-align:center; padding:0 22px 44px; }
+    .lp-foot {
+        text-align:center; padding:20px; border-top:1px solid #eee;
+        background:#fafafa;
+    }
+    .lp-foot a { font-size:12px; color:#aaa; margin:0 10px; text-decoration:none; }
+    .lp-foot a:hover { color:#3498db; }
     </style>
 
-    <div class="hero">
-        <h1>Casey's Cleaning Company</h1>
-        <p>Reliable, detail-oriented residential &amp; commercial cleaning, proudly serving Las Vegas.</p>
-        <a class="quote-btn-large" href="/quote">Request a Quote</a>
-    </div>
+    <div class="lp">
+      <div class="lp-hero">
+        <h1>Las Vegas&rsquo;s Trusted Home Cleaning</h1>
+        <p class="tag">Spotless homes, honest pricing, people you can trust in your home.</p>
+        <a class="lp-cta" href="/quote">Get My Free Quote &rarr;</a>
+      </div>
 
-    <div class="about">
-        <p>Casey's Cleaning Company keeps Las Vegas homes and businesses spotless with a trained, background-checked team you can trust. Whether it's a one-time deep clean, a recurring service, or a short-term rental turnover, we treat every property like it's our own.</p>
+      <div class="lp-trust">
+        <span>&#10003; Bonded</span>
+        <span>&#10003; Insured</span>
+        <span>&#10003; Veteran-Owned</span>
+        <span>&#10003; Background-Checked</span>
+      </div>
+
+      <div class="lp-photos">
+        <!-- PHOTO_1 --><div class="lp-photo"><div class="lp-ph">Your after-photo #1<br>(swap in later)</div></div>
+        <!-- PHOTO_2 --><div class="lp-photo"><div class="lp-ph">Your after-photo #2<br>(swap in later)</div></div>
+        <!-- PHOTO_3 --><div class="lp-photo"><div class="lp-ph">Your after-photo #3<br>(swap in later)</div></div>
+      </div>
+
+      <div class="lp-services">
+        <div class="lp-svc"><b>Standard</b><span>Regular upkeep</span></div>
+        <div class="lp-svc"><b>Deep Clean</b><span>Top to bottom</span></div>
+        <div class="lp-svc"><b>Move-Out</b><span>Ready for new</span></div>
+        <div class="lp-svc"><b>Airbnb</b><span>Rental turnover</span></div>
+      </div>
+
+      <div class="lp-about">
+        We keep Las Vegas homes spotless with a trained, background-checked team
+        you can trust. One-time deep clean, recurring service, or a short-term
+        rental turnover &mdash; we treat every home like it&rsquo;s our own.
+      </div>
+
+      <div class="lp-bottom">
+        <a class="lp-cta" href="/quote">Get My Free Quote &rarr;</a>
+      </div>
     </div>
     '''
 
     if not session.get('logged_in') and not session.get('trainee_id'):
         html += '''
-    <div class="footer-nav">
-        <a href="/jobs">View Jobs</a>
-        <a href="/login">Admin Login</a>
-        <a href="/trainee-login">Trainee Login</a>
+    <div class="lp-foot">
+        <a href="/jobs">Careers</a>
+        <a href="/login">Admin</a>
+        <a href="/trainee-login">Staff</a>
     </div>
     '''
 
