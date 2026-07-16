@@ -3155,7 +3155,10 @@ def send_quote_emails(customer_email, customer_name, price, type_label,
         server.sendmail(user, [customer_email], cust.as_string())
         server.quit()
         return True
-    except Exception:
+    except Exception as e:
+        import traceback
+        print("QUOTE EMAIL FAILED:", repr(e), flush=True)
+        traceback.print_exc()
         return False
 
 
