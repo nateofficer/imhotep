@@ -3117,16 +3117,17 @@ def send_quote_emails(customer_email, customer_name, price, type_label,
     import os, smtplib
     from email.mime.text import MIMEText
     from email.mime.multipart import MIMEMultipart
-    user = os.environ.get('GMAIL_USER')
-    pw = os.environ.get('GMAIL_APP_PASSWORD')
-    if not user or not pw:
+    api_key = os.environ.get('RESEND_API_KEY')
+    owner_email = os.environ.get('GMAIL_USER') or os.environ.get('OWNER_EMAIL')
+    from_addr = os.environ.get('MAIL_FROM', 'quotes@caseyscleaning.net')
+    if not api_key or not owner_email:
         return False
     try:
         biz = "Casey's Cleaning"
         owner = MIMEMultipart('alternative')
         owner['Subject'] = "New quote lead: %s ($%s)" % (customer_name, price)
-        owner['From'] = user
-        owner['To'] = user
+        owner['From'] = "Casey's Cleaning <%s>" % from_addr
+        owner['To'] = owner_email
         owner.attach(MIMEText(
             "New quote request via %s\n\nName: %s\nEmail: %s\nPhone: %s\n"
             "Address: %s\n\n%s | %s | %s bed / %s bath / %s sqft\n"
@@ -3136,9 +3137,9 @@ def send_quote_emails(customer_email, customer_name, price, type_label,
                 bedrooms, bathrooms, sqft, price), 'plain'))
         cust = MIMEMultipart('alternative')
         cust['Subject'] = "Your free quote from %s" % biz
-        cust['From'] = "%s <%s>" % (biz, user)
+        cust['From'] = "%s <%s>" % (biz, from_addr)
         cust['To'] = customer_email
-        cust['Reply-To'] = user
+        cust['Reply-To'] = owner_email
         cust.attach(MIMEText(
             "Hi %s,\n\nThanks for reaching out to Casey's Cleaning! "
             "Based on what you told us, your estimated price is:\n\n"
@@ -3148,11 +3149,11 @@ def send_quote_emails(customer_email, customer_name, price, type_label,
             "We'll be in touch shortly to schedule. Reply to this email anytime.\n\n"
             "Casey's Cleaning of Las Vegas\n(702) 506-8918\n" % (
                 customer_name, price, type_label, freq_label), 'plain'))
-        server = smtplib.SMTP('smtp.gmail.com', 587, timeout=15)
+        server = smtplib.SMTP('smtp.resend.com', 587, timeout=15)
         server.starttls()
-        server.login(user, pw)
-        server.sendmail(user, [user], owner.as_string())
-        server.sendmail(user, [customer_email], cust.as_string())
+        server.login('resend', api_key)
+        server.sendmail(from_addr, [owner_email], owner.as_string())
+        server.sendmail(from_addr, [customer_email], cust.as_string())
         server.quit()
         return True
     except Exception as e:
