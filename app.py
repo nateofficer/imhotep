@@ -3245,8 +3245,10 @@ def quote_price():
                 (first_name, last_name, phone, email, address, cleaning_type, full_notes))
         conn.commit()
         conn.close()
-    except Exception:
-        pass
+    except Exception as _e:
+        import traceback
+        print("LEAD INSERT FAILED:", repr(_e), flush=True)
+        traceback.print_exc()
 
     log_quote_event('lead', source)
 
