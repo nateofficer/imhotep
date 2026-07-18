@@ -813,7 +813,45 @@ def dashboard():
     if recent_leads:
         leads_section = '<table><tr><th>Name</th><th>Service</th><th>Status</th><th></th></tr>' + lead_rows + '</table>'
     else:
-        leads_section = '<p class="empty-msg">No leads yet.</p>'
+        # --- leads list (auto-generated; fail-safe) ---
+        _empty_msg = '<p class="empty-msg">No leads yet. Add one manually or share your quote request link with customers: <b>/quote</b></p>'
+        _leads = None
+        try:
+            try:
+                _c = cursor
+                _c.execute("SELECT * FROM leads ORDER BY id DESC")
+            except Exception:
+                _c = mysql.connection.cursor()
+                _c.execute("SELECT * FROM leads ORDER BY id DESC")
+            _rows = _c.fetchall()
+            _cols = [d[0] for d in _c.description]
+            _leads = [dict(zip(_cols, _r)) for _r in _rows]
+        except Exception:
+            _leads = None
+        if not _leads:
+            leads_section = _empty_msg
+        else:
+            _body = ('<table style="width:100%;border-collapse:collapse">'
+                     '<tr style="text-align:left;border-bottom:2px solid #ccc">'
+                     '<th style="padding:8px">Name</th><th style="padding:8px">Email</th>'
+                     '<th style="padding:8px">Phone</th><th style="padding:8px">Source</th>'
+                     '<th style="padding:8px">Date</th><th style="padding:8px"></th></tr>')
+            for _l in _leads:
+                _name = (_l.get('name') or ((str(_l.get('first_name') or '') + ' ' + str(_l.get('last_name') or '')).strip()) or '-')
+                _email = _l.get('email') or '-'
+                _phone = _l.get('phone') or '-'
+                _src = _l.get('source') or _l.get('lead_source') or _l.get('lead_source_id') or '-'
+                _date = _l.get('created_at') or _l.get('date') or _l.get('created') or ''
+                _lid = _l.get('id')
+                _body += ('<tr style="border-bottom:1px solid #eee">'
+                          '<td style="padding:8px">%s</td><td style="padding:8px">%s</td>'
+                          '<td style="padding:8px">%s</td><td style="padding:8px">%s</td>'
+                          '<td style="padding:8px">%s</td>'
+                          '<td style="padding:8px"><form method="POST" action="/leads/%s/convert" style="margin:0">'
+                          '<button type="submit" style="background:#2c3e50;color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer">Convert</button>'
+                          '</form></td></tr>') % (_name, _email, _phone, _src, str(_date)[:16], _lid)
+            leads_section = _body + '</table>'
+        # --- end leads list ---
 
     if recent_jobs:
         schedule_section = '<table><tr><th>Customer</th><th>Date</th><th>Status</th><th></th></tr>' + job_rows + '</table>'
