@@ -1099,7 +1099,9 @@ def dashboard():
             document.addEventListener('click', function(e){{
               var b = e.target.closest('.copy-src');
               if(!b) return;
-              var url = window.location.origin + '/quote?utm_source=' + b.getAttribute('data-src');
+              var SHORTS = {{facebook:'/fb', nextdoor:'/nd', instagram:'/ig', craigslist:'/cl', tiktok:'/tt', thumbtack:'/tb', yelp:'/yelp'}};
+              var src = b.getAttribute('data-src');
+              var url = window.location.origin + (SHORTS[src] || ('/quote?utm_source=' + src));
               var done = function(){{
                 var m = document.getElementById('copied-msg');
                 m.textContent = 'Copied: ' + url;
