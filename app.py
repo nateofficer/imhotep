@@ -4883,6 +4883,29 @@ def convert_lead(lead_id):
     conn.close()
     return redirect('/customers')
 
+# --- short source-tagged ad links (auto-generated) ---
+_SHORT_SOURCES = {
+    'fb': 'facebook',
+    'nd': 'nextdoor',
+    'gg': 'google',
+    'cl': 'craigslist',
+    'yelp': 'yelp',
+    'ig': 'instagram',
+    'tt': 'tiktok',
+    'tb': 'thumbtack',
+}
+
+def _short_link_redirect():
+    from flask import request as _rq, redirect as _rd
+    _code = _rq.path.strip('/').lower()
+    _src = _SHORT_SOURCES.get(_code, 'direct')
+    return _rd('/quote?utm_source=' + _src, code=302)
+
+for _sc, _ss in _SHORT_SOURCES.items():
+    if not any(_r.rule == '/' + _sc for _r in app.url_map.iter_rules()):
+        app.add_url_rule('/' + _sc, 'shortlink_' + _sc, _short_link_redirect)
+# --- end short ad links ---
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
