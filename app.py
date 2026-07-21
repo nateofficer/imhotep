@@ -23,7 +23,7 @@ app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-change-me')
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-app.config['PERMANENT_SESSION_LIFETIME'] = 86400  # 24 hours
+app.config['PERMANENT_SESSION_LIFETIME'] = 28800  # 8 hours  SESSION_HARDENING_V1
 
 # Cloudinary config
 cloudinary.config(
@@ -631,6 +631,7 @@ def login():
         if password == ADMIN_PASSWORD:
             session['logged_in'] = True
             session.permanent = True
+            session.pop('rnd_ok', None)  # SESSION_HARDENING_V1 -- R&D unlock is per-session
             return redirect('/dashboard')
         else:
             error = '<div class="error">Incorrect password. Try again.</div>'
@@ -648,7 +649,7 @@ def login():
 
 @app.route('/logout')
 def logout():
-    session.pop('logged_in', None)
+    session.clear()  # SESSION_HARDENING_V1
     return redirect('/')
 
 
@@ -2096,7 +2097,7 @@ def trainee_login():
 
 @app.route('/trainee-logout')
 def trainee_logout():
-    session.pop('trainee_id', None)
+    session.clear()  # SESSION_HARDENING_V1
     return redirect('/')
 
 
