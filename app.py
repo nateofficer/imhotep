@@ -4908,6 +4908,410 @@ for _sc, _ss in _SHORT_SOURCES.items():
         app.add_url_rule('/' + _sc, 'shortlink_' + _sc, _short_link_redirect)
 # --- end short ad links ---
 
+# ---------------------------------------------------------------------------
+# RND_MODULE_V1 -- Research & Development
+# Small problems take the decision path, large ones take the research path.
+# Admin-only (session['logged_in']) + RND_CODE passcode. 404 to everyone else.
+# ---------------------------------------------------------------------------
+import os as _rnd_os
+import html as _rnd_html
+from datetime import datetime as _rnd_dt
+
+_RND_DECISION_STEPS = [
+    "Identify the problem",
+    "Generate alternatives",
+    "Evaluate and select",
+    "Implement",
+    "Evaluate the result",
+]
+
+_RND_RESEARCH_STEPS = [
+    "Define the problem",
+    "Literature review",
+    "Design / hypothesis",
+    "Collect data",
+    "Analyze data",
+    "Conclusions and recommendations",
+    "Implement",
+    "Evaluate the result",
+]
+
+_RND_DOMAINS = ["marketing", "hiring", "pricing", "labor", "ops", "finance", "product"]
+_RND_READY = {"done": False}
+_RND_404 = ("<h1>Not Found</h1><p>The requested URL was not found on the server.</p>", 404)
+
+
+def _rnd_conn():
+    return get_db()
+
+
+def _rnd_style():
+    return globals().get("STYLE", "")
+
+
+def _rnd_nav():
+    fn = globals().get("admin_nav")
+    try:
+        return fn() if callable(fn) else ""
+    except Exception:
+        return ""
+
+
+def _rnd_is_admin():
+    return bool(session.get("logged_in"))
+
+
+def _rnd_unlocked():
+    return bool(session.get("rnd_ok"))
+
+
+def _rnd_esc(v):
+    return _rnd_html.escape("" if v is None else str(v))
+
+
+def _rnd_init():
+    if _RND_READY["done"]:
+        return
+    conn = _rnd_conn()
+    cur = conn.cursor()
+    cur.execute("""CREATE TABLE IF NOT EXISTS rnd_problems (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        statement TEXT,
+        domain VARCHAR(50),
+        reversible TINYINT(1) DEFAULT 0,
+        recurring TINYINT(1) DEFAULT 0,
+        data_on_hand TINYINT(1) DEFAULT 0,
+        cost_bounded TINYINT(1) DEFAULT 0,
+        path VARCHAR(20),
+        path_override TINYINT(1) DEFAULT 0,
+        status VARCHAR(20) DEFAULT 'open',
+        current_step INT DEFAULT 1,
+        opened_at DATETIME,
+        closed_at DATETIME,
+        decision_made TEXT,
+        predicted TEXT,
+        metric VARCHAR(100),
+        baseline DECIMAL(12,2),
+        review_date DATE,
+        actual DECIMAL(12,2),
+        outcome VARCHAR(20),
+        lesson TEXT
+    )""")
+    cur.execute("""CREATE TABLE IF NOT EXISTS rnd_steps (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        problem_id INT NOT NULL,
+        step_no INT,
+        step_name VARCHAR(100),
+        content TEXT,
+        completed TINYINT(1) DEFAULT 0,
+        completed_at DATETIME,
+        INDEX (problem_id)
+    )""")
+    conn.commit()
+    cur.close()
+    conn.close()
+    _RND_READY["done"] = True
+
+
+def _rnd_triage(reversible, recurring, data_on_hand, cost_bounded):
+    """Four yeses -> decision path. Any no -> research path."""
+    return "decision" if all([reversible, recurring, data_on_hand, cost_bounded]) else "research"
+
+
+def _rnd_chk(name, label):
+    return ('<label style="display:block;margin:4px 0">'
+            '<input type="checkbox" name="' + name + '" value="1"> ' + label + '</label>')
+
+
+def _rnd_gate_page():
+    b = ['<h1>R&amp;D</h1>',
+         '<p>This area requires the R&amp;D passcode.</p>',
+         '<form method="POST" action="/rnd/unlock" style="max-width:340px">',
+         '<p><input type="password" name="code" autofocus '
+         'style="width:100%;padding:10px" placeholder="Passcode"></p>',
+         '<p><button type="submit" class="btn">Enter</button></p>',
+         '</form>']
+    if request.args.get("bad"):
+        b.insert(2, '<p style="color:#b00"><b>Incorrect passcode.</b></p>')
+    return _rnd_style() + _rnd_nav() + ''.join(b)
+
+
+def _rnd_unlock():
+    if not _rnd_is_admin():
+        return _RND_404
+    expected = _rnd_os.environ.get("RND_CODE", "")
+    supplied = (request.form.get("code") or "").strip()
+    if expected and supplied == expected:
+        session["rnd_ok"] = True
+        return redirect("/rnd")
+    return redirect("/rnd?bad=1")
+
+
+def _rnd_list():
+    if not _rnd_is_admin():
+        return _RND_404
+    if not _rnd_unlocked():
+        return _rnd_gate_page()
+    _rnd_init()
+    conn = _rnd_conn()
+    cur = conn.cursor()
+    cur.execute("""SELECT id, title, domain, path, status, current_step, outcome
+                   FROM rnd_problems ORDER BY (status='closed'), id DESC""")
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    body = ['<h1>R&amp;D</h1>',
+            '<p style="color:#666">Small problems take the decision path. '
+            'Large ones take the research path.</p>']
+    if not rows:
+        body.append('<p class="empty-msg">No problems logged yet.</p>')
+    else:
+        body.append('<table cellpadding="8" cellspacing="0" '
+                    'style="border-collapse:collapse;width:100%">')
+        body.append('<tr style="text-align:left;border-bottom:2px solid #ddd">'
+                    '<th>#</th><th>Problem</th><th>Domain</th><th>Path</th>'
+                    '<th>Status</th><th>Outcome</th></tr>')
+        for r in rows:
+            pid, title, domain, path, status, step, outcome = (r[0], r[1], r[2],
+                                                               r[3], r[4], r[5], r[6])
+            color = '#2d6cdf' if path == 'decision' else '#7a4bd0'
+            badge = ('<span style="background:' + color + ';color:#fff;padding:2px 8px;'
+                     'border-radius:10px;font-size:12px">' + _rnd_esc(path) + '</span>')
+            body.append('<tr style="border-bottom:1px solid #eee">'
+                        '<td>' + str(pid) + '</td>'
+                        '<td><a href="/rnd/' + str(pid) + '">' + _rnd_esc(title) + '</a></td>'
+                        '<td>' + _rnd_esc(domain) + '</td>'
+                        '<td>' + badge + '</td>'
+                        '<td>' + _rnd_esc(status) + ' (step ' + str(step) + ')</td>'
+                        '<td>' + _rnd_esc(outcome or '-') + '</td></tr>')
+        body.append('</table>')
+
+    opts = ''.join('<option value="' + d + '">' + d + '</option>' for d in _RND_DOMAINS)
+    body.append('<h2 style="margin-top:32px">Log a new problem</h2>')
+    body.append('<form method="POST" action="/rnd/new" style="max-width:640px">')
+    body.append('<p><input name="title" placeholder="Problem in one line" '
+                'style="width:100%;padding:8px" required></p>')
+    body.append('<p><textarea name="statement" rows="4" style="width:100%;padding:8px" '
+                'placeholder="State the problem in a paragraph"></textarea></p>')
+    body.append('<p>Domain: <select name="domain">' + opts + '</select></p>')
+    body.append('<fieldset style="border:1px solid #ddd;padding:12px">'
+                '<legend><b>Triage gate</b> &mdash; all four checked = decision path</legend>')
+    body.append(_rnd_chk("reversible", "Reversible &mdash; can I undo it cheaply?"))
+    body.append(_rnd_chk("recurring", "Recurring &mdash; have I faced this exact problem before?"))
+    body.append(_rnd_chk("data_on_hand", "Known variables &mdash; do I already have the data?"))
+    body.append(_rnd_chk("cost_bounded", "Bounded cost &mdash; is the downside small?"))
+    body.append('</fieldset>')
+    body.append('<p><input name="metric" placeholder="Metric to watch '
+                '(e.g. leads_per_week_facebook)" style="width:100%;padding:8px"></p>')
+    body.append('<p><input name="baseline" placeholder="Baseline value today (number)" '
+                'style="width:100%;padding:8px"></p>')
+    body.append('<p><input name="predicted" placeholder="What I expect to happen" '
+                'style="width:100%;padding:8px"></p>')
+    body.append('<p><label>Review on: <input type="date" name="review_date"></label></p>')
+    body.append('<p><button type="submit" class="btn">Run triage</button></p></form>')
+    return _rnd_style() + _rnd_nav() + ''.join(body)
+
+
+def _rnd_new():
+    if not _rnd_is_admin():
+        return _RND_404
+    if not _rnd_unlocked():
+        return redirect("/rnd")
+    _rnd_init()
+    f = request.form
+    rev = 1 if f.get("reversible") else 0
+    rec = 1 if f.get("recurring") else 0
+    dat = 1 if f.get("data_on_hand") else 0
+    cost = 1 if f.get("cost_bounded") else 0
+    path = _rnd_triage(rev, rec, dat, cost)
+    steps = _RND_DECISION_STEPS if path == "decision" else _RND_RESEARCH_STEPS
+
+    try:
+        baseline = float(f.get("baseline")) if f.get("baseline") else None
+    except ValueError:
+        baseline = None
+
+    conn = _rnd_conn()
+    cur = conn.cursor()
+    cur.execute("""INSERT INTO rnd_problems
+        (title, statement, domain, reversible, recurring, data_on_hand, cost_bounded,
+         path, status, current_step, opened_at, predicted, metric, baseline, review_date)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'open',1,%s,%s,%s,%s,%s)""",
+        (f.get("title", "").strip(), f.get("statement", ""), f.get("domain", ""),
+         rev, rec, dat, cost, path, _rnd_dt.now(),
+         f.get("predicted", ""), f.get("metric", ""), baseline,
+         f.get("review_date") or None))
+    pid = cur.lastrowid
+    for i, name in enumerate(steps, start=1):
+        cur.execute("INSERT INTO rnd_steps (problem_id, step_no, step_name) VALUES (%s,%s,%s)",
+                    (pid, i, name))
+    conn.commit()
+    cur.close()
+    conn.close()
+    return redirect("/rnd/" + str(pid))
+
+
+def _rnd_detail(pid):
+    if not _rnd_is_admin():
+        return _RND_404
+    if not _rnd_unlocked():
+        return redirect("/rnd")
+    _rnd_init()
+    conn = _rnd_conn()
+    cur = conn.cursor()
+    cur.execute("""SELECT id,title,statement,domain,path,status,current_step,
+                          predicted,metric,baseline,review_date,actual,outcome,lesson
+                   FROM rnd_problems WHERE id=%s""", (pid,))
+    p = cur.fetchone()
+    if not p:
+        cur.close()
+        conn.close()
+        return _RND_404
+    cur.execute("""SELECT step_no, step_name, content, completed
+                   FROM rnd_steps WHERE problem_id=%s ORDER BY step_no""", (pid,))
+    steps = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    kind = ("Decision path &mdash; small problem" if p[4] == "decision"
+            else "Research path &mdash; large problem")
+    b = ['<p><a href="/rnd">&larr; All problems</a></p>',
+         '<h1>' + _rnd_esc(p[1]) + '</h1>',
+         '<p><b>' + kind + '</b> &nbsp;|&nbsp; ' + _rnd_esc(p[3]) +
+         ' &nbsp;|&nbsp; ' + _rnd_esc(p[5]) + '</p>']
+    if p[2]:
+        b.append('<p style="background:#f6f6f6;padding:12px">' + _rnd_esc(p[2]) + '</p>')
+    if p[8]:
+        b.append('<p><b>Watching:</b> ' + _rnd_esc(p[8]) + ' &nbsp; baseline ' +
+                 _rnd_esc(p[9]) + ' &nbsp; review ' + _rnd_esc(p[10]) + '</p>')
+    if p[7]:
+        b.append('<p><b>Predicted:</b> ' + _rnd_esc(p[7]) + '</p>')
+
+    b.append('<h2>Steps</h2>')
+    for s in steps:
+        no, name, content, done = s[0], s[1], s[2], s[3]
+        bg = '#f0fbf2' if done else '#fff'
+        b.append('<div style="border:1px solid #ddd;background:' + bg +
+                 ';padding:12px;margin:10px 0">')
+        b.append('<b>' + str(no) + '. ' + ('&#10004; ' if done else '') +
+                 _rnd_esc(name) + '</b>')
+        b.append('<form method="POST" action="/rnd/' + str(pid) + '/step">')
+        b.append('<input type="hidden" name="step_no" value="' + str(no) + '">')
+        b.append('<textarea name="content" rows="3" style="width:100%;padding:8px">' +
+                 _rnd_esc(content) + '</textarea>')
+        b.append('<label style="display:inline-block;margin:6px 12px 0 0">'
+                 '<input type="checkbox" name="completed" value="1"' +
+                 (' checked' if done else '') + '> complete</label>')
+        b.append('<button type="submit" class="btn">Save</button></form></div>')
+
+    b.append('<h2>Outcome</h2>')
+    if p[12]:
+        b.append('<p><b>' + _rnd_esc(p[12]) + '</b> &mdash; actual ' + _rnd_esc(p[11]) + '</p>')
+        b.append('<p>' + _rnd_esc(p[13]) + '</p>')
+    else:
+        b.append('<form method="POST" action="/rnd/' + str(pid) + '/close" '
+                 'style="max-width:640px">')
+        b.append('<p><input name="actual" placeholder="Actual value of the metric" '
+                 'style="width:100%;padding:8px"></p>')
+        b.append('<p><select name="outcome">'
+                 '<option value="worked">worked</option>'
+                 '<option value="failed">failed</option>'
+                 '<option value="inconclusive">inconclusive</option></select></p>')
+        b.append('<p><textarea name="lesson" rows="3" style="width:100%;padding:8px" '
+                 'placeholder="What I learned"></textarea></p>')
+        b.append('<p><button type="submit" class="btn">Close problem</button></p></form>')
+    return _rnd_style() + _rnd_nav() + ''.join(b)
+
+
+def _rnd_step(pid):
+    if not _rnd_is_admin():
+        return _RND_404
+    if not _rnd_unlocked():
+        return redirect("/rnd")
+    _rnd_init()
+    f = request.form
+    done = 1 if f.get("completed") else 0
+    try:
+        no = int(f.get("step_no", 1))
+    except ValueError:
+        no = 1
+    conn = _rnd_conn()
+    cur = conn.cursor()
+    cur.execute("""UPDATE rnd_steps SET content=%s, completed=%s, completed_at=%s
+                   WHERE problem_id=%s AND step_no=%s""",
+                (f.get("content", ""), done, _rnd_dt.now() if done else None, pid, no))
+    cur.execute("""SELECT COALESCE(MIN(step_no), 0) FROM rnd_steps
+                   WHERE problem_id=%s AND completed=0""", (pid,))
+    row = cur.fetchone()
+    nxt = row[0] if row and row[0] else no
+    cur.execute("UPDATE rnd_problems SET current_step=%s, status='active' WHERE id=%s",
+                (nxt, pid))
+    conn.commit()
+    cur.close()
+    conn.close()
+    return redirect("/rnd/" + str(pid))
+
+
+def _rnd_close(pid):
+    if not _rnd_is_admin():
+        return _RND_404
+    if not _rnd_unlocked():
+        return redirect("/rnd")
+    _rnd_init()
+    f = request.form
+    try:
+        actual = float(f.get("actual")) if f.get("actual") else None
+    except ValueError:
+        actual = None
+    conn = _rnd_conn()
+    cur = conn.cursor()
+    cur.execute("""UPDATE rnd_problems SET actual=%s, outcome=%s, lesson=%s,
+                          status='closed', closed_at=%s WHERE id=%s""",
+                (actual, f.get("outcome", ""), f.get("lesson", ""), _rnd_dt.now(), pid))
+    conn.commit()
+    cur.close()
+    conn.close()
+    return redirect("/rnd/" + str(pid))
+
+
+# --- nav injection: wrap admin_nav instead of editing its internals -----------
+if callable(globals().get("admin_nav")):
+    _rnd_prev_admin_nav = admin_nav
+
+    def admin_nav(*a, **kw):
+        try:
+            out = _rnd_prev_admin_nav(*a, **kw)
+        except Exception:
+            raise
+        try:
+            if not session.get("logged_in"):
+                return out
+            if 'href="/rnd"' in out:
+                return out
+            link = '<a href="/rnd">R&amp;D</a>'
+            if "</nav>" in out:
+                return out.replace("</nav>", link + "</nav>", 1)
+            return out + link
+        except Exception:
+            return out
+
+
+for _rnd_rule, _rnd_ep, _rnd_fn, _rnd_m in [
+    ("/rnd", "rnd_list", _rnd_list, ["GET"]),
+    ("/rnd/unlock", "rnd_unlock", _rnd_unlock, ["POST"]),
+    ("/rnd/new", "rnd_new", _rnd_new, ["POST"]),
+    ("/rnd/<int:pid>", "rnd_detail", _rnd_detail, ["GET"]),
+    ("/rnd/<int:pid>/step", "rnd_step", _rnd_step, ["POST"]),
+    ("/rnd/<int:pid>/close", "rnd_close", _rnd_close, ["POST"]),
+]:
+    if not any(str(r.rule) == _rnd_rule for r in app.url_map.iter_rules()):
+        app.add_url_rule(_rnd_rule, _rnd_ep, _rnd_fn, methods=_rnd_m)
+# ------------------------------------------------------- end RND_MODULE_V1
+
+
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
