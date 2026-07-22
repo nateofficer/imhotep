@@ -5313,6 +5313,47 @@ for _rnd_rule, _rnd_ep, _rnd_fn, _rnd_m in [
 
 
 
+# ---------------------------------------------------------------------------
+# RND_REBUILD_V1 -- one-time: drop the R&D tables so they rebuild clean.
+# Admin-only (404 otherwise). Remove after use.
+# ---------------------------------------------------------------------------
+def _rnd_rebuild():
+    if not session.get("logged_in"):
+        return ("<h1>Not Found</h1><p>The requested URL was not found on the server.</p>", 404)
+    conn = get_db()
+    cur = conn.cursor()
+    dropped = []
+    errors = []
+    for _t in ("rnd_steps", "rnd_problems"):
+        try:
+            cur.execute("DROP TABLE IF EXISTS " + _t)
+            dropped.append(_t)
+        except Exception as _e:
+            errors.append(_t + ": " + str(_e))
+    conn.commit()
+    cur.close()
+    conn.close()
+    # force the lazy creator to run again next visit
+    try:
+        globals().get("_RND_READY", {})["done"] = False
+    except Exception:
+        pass
+    msg = ["<h1>R&amp;D tables rebuilt</h1>"]
+    msg.append("<p>Dropped: " + (", ".join(dropped) if dropped else "none") + "</p>")
+    if errors:
+        msg.append("<p style='color:#b00'>Errors: " + " | ".join(errors) + "</p>")
+    msg.append('<p><a href="/rnd">Go to R&amp;D</a> &mdash; the tables will '
+               "recreate with the correct columns when it loads.</p>")
+    msg.append("<p style='color:#666'>You can now remove the /rnd/rebuild route.</p>")
+    return "".join(msg)
+
+
+if not any(str(r.rule) == "/rnd/rebuild" for r in app.url_map.iter_rules()):
+    app.add_url_rule("/rnd/rebuild", "rnd_rebuild", _rnd_rebuild, methods=["GET"])
+# ------------------------------------------------------- end RND_REBUILD_V1
+
+
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
