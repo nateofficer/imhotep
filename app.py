@@ -4910,7 +4910,7 @@ for _sc, _ss in _SHORT_SOURCES.items():
 # --- end short ad links ---
 
 # ---------------------------------------------------------------------------
-# RND_MODULE_V1 -- Research & Development
+# RND_MODULE_V1 -- Research & Development  (RND_DICTFIX_V1 applied)
 # Small problems take the decision path, large ones take the research path.
 # Admin-only (session['logged_in']) + RND_CODE passcode. 404 to everyone else.
 # ---------------------------------------------------------------------------
@@ -5075,8 +5075,9 @@ def _rnd_list():
                     '<th>#</th><th>Problem</th><th>Domain</th><th>Path</th>'
                     '<th>Status</th><th>Outcome</th></tr>')
         for r in rows:
-            pid, title, domain, path, status, step, outcome = (r[0], r[1], r[2],
-                                                               r[3], r[4], r[5], r[6])
+            pid, title, domain, path, status, step, outcome = (
+                r['id'], r['title'], r['domain'], r['path'],
+                r['status'], r['current_step'], r['outcome'])
             color = '#2d6cdf' if path == 'decision' else '#7a4bd0'
             badge = ('<span style="background:' + color + ';color:#fff;padding:2px 8px;'
                      'border-radius:10px;font-size:12px">' + _rnd_esc(path) + '</span>')
@@ -5176,23 +5177,24 @@ def _rnd_detail(pid):
     cur.close()
     conn.close()
 
-    kind = ("Decision path &mdash; small problem" if p[4] == "decision"
+    kind = ("Decision path &mdash; small problem" if p['path'] == "decision"
             else "Research path &mdash; large problem")
     b = ['<p><a href="/rnd">&larr; All problems</a></p>',
-         '<h1>' + _rnd_esc(p[1]) + '</h1>',
-         '<p><b>' + kind + '</b> &nbsp;|&nbsp; ' + _rnd_esc(p[3]) +
-         ' &nbsp;|&nbsp; ' + _rnd_esc(p[5]) + '</p>']
-    if p[2]:
-        b.append('<p style="background:#f6f6f6;padding:12px">' + _rnd_esc(p[2]) + '</p>')
-    if p[8]:
-        b.append('<p><b>Watching:</b> ' + _rnd_esc(p[8]) + ' &nbsp; baseline ' +
-                 _rnd_esc(p[9]) + ' &nbsp; review ' + _rnd_esc(p[10]) + '</p>')
-    if p[7]:
-        b.append('<p><b>Predicted:</b> ' + _rnd_esc(p[7]) + '</p>')
+         '<h1>' + _rnd_esc(p['title']) + '</h1>',
+         '<p><b>' + kind + '</b> &nbsp;|&nbsp; ' + _rnd_esc(p['domain']) +
+         ' &nbsp;|&nbsp; ' + _rnd_esc(p['status']) + '</p>']
+    if p['statement']:
+        b.append('<p style="background:#f6f6f6;padding:12px">' + _rnd_esc(p['statement']) + '</p>')
+    if p['metric']:
+        b.append('<p><b>Watching:</b> ' + _rnd_esc(p['metric']) + ' &nbsp; baseline ' +
+                 _rnd_esc(p['baseline']) + ' &nbsp; review ' + _rnd_esc(p['review_date']) + '</p>')
+    if p['predicted']:
+        b.append('<p><b>Predicted:</b> ' + _rnd_esc(p['predicted']) + '</p>')
 
     b.append('<h2>Steps</h2>')
     for s in steps:
-        no, name, content, done = s[0], s[1], s[2], s[3]
+        no, name, content, done = (s['step_no'], s['step_name'],
+                                   s['content'], s['completed'])
         bg = '#f0fbf2' if done else '#fff'
         b.append('<div style="border:1px solid #ddd;background:' + bg +
                  ';padding:12px;margin:10px 0">')
@@ -5208,9 +5210,9 @@ def _rnd_detail(pid):
         b.append('<button type="submit" class="btn">Save</button></form></div>')
 
     b.append('<h2>Outcome</h2>')
-    if p[12]:
-        b.append('<p><b>' + _rnd_esc(p[12]) + '</b> &mdash; actual ' + _rnd_esc(p[11]) + '</p>')
-        b.append('<p>' + _rnd_esc(p[13]) + '</p>')
+    if p['outcome']:
+        b.append('<p><b>' + _rnd_esc(p['outcome']) + '</b> &mdash; actual ' + _rnd_esc(p['actual']) + '</p>')
+        b.append('<p>' + _rnd_esc(p['lesson']) + '</p>')
     else:
         b.append('<form method="POST" action="/rnd/' + str(pid) + '/close" '
                  'style="max-width:640px">')
@@ -5246,7 +5248,8 @@ def _rnd_step(pid):
     cur.execute("""SELECT COALESCE(MIN(step_no), 0) FROM rnd_steps
                    WHERE problem_id=%s AND completed=0""", (pid,))
     row = cur.fetchone()
-    nxt = row[0] if row and row[0] else no
+    _minv = list(row.values())[0] if row else None
+    nxt = _minv if _minv else no
     cur.execute("UPDATE rnd_problems SET current_step=%s, status='active' WHERE id=%s",
                 (nxt, pid))
     conn.commit()
@@ -5313,70 +5316,9 @@ for _rnd_rule, _rnd_ep, _rnd_fn, _rnd_m in [
 
 
 
-# ---------------------------------------------------------------------------
-# RND_REBUILD_V1 -- one-time: drop the R&D tables so they rebuild clean.
-# Admin-only (404 otherwise). Remove after use.
-# ---------------------------------------------------------------------------
-def _rnd_rebuild():
-    if not session.get("logged_in"):
-        return ("<h1>Not Found</h1><p>The requested URL was not found on the server.</p>", 404)
-    conn = get_db()
-    cur = conn.cursor()
-    dropped = []
-    errors = []
-    for _t in ("rnd_steps", "rnd_problems"):
-        try:
-            cur.execute("DROP TABLE IF EXISTS " + _t)
-            dropped.append(_t)
-        except Exception as _e:
-            errors.append(_t + ": " + str(_e))
-    conn.commit()
-    cur.close()
-    conn.close()
-    # force the lazy creator to run again next visit
-    try:
-        globals().get("_RND_READY", {})["done"] = False
-    except Exception:
-        pass
-    msg = ["<h1>R&amp;D tables rebuilt</h1>"]
-    msg.append("<p>Dropped: " + (", ".join(dropped) if dropped else "none") + "</p>")
-    if errors:
-        msg.append("<p style='color:#b00'>Errors: " + " | ".join(errors) + "</p>")
-    msg.append('<p><a href="/rnd">Go to R&amp;D</a> &mdash; the tables will '
-               "recreate with the correct columns when it loads.</p>")
-    msg.append("<p style='color:#666'>You can now remove the /rnd/rebuild route.</p>")
-    return "".join(msg)
-
-
-if not any(str(r.rule) == "/rnd/rebuild" for r in app.url_map.iter_rules()):
-    app.add_url_rule("/rnd/rebuild", "rnd_rebuild", _rnd_rebuild, methods=["GET"])
-# ------------------------------------------------------- end RND_REBUILD_V1
 
 
 
-# ---------------------------------------------------------------------------
-# RND_DEBUG_V1 -- show the real traceback on /rnd routes to logged-in admins.
-# Diagnostic only. Remove after the /rnd/<id> 500 is fixed.
-# ---------------------------------------------------------------------------
-import traceback as _rnddbg_tb
-
-
-@app.errorhandler(500)
-def _rnddbg_500(_e):
-    try:
-        p = request.path or ""
-    except Exception:
-        p = ""
-    if p.startswith("/rnd") and session.get("logged_in"):
-        tb = _rnddbg_tb.format_exc()
-        return ("<h1>R&amp;D debug -- real error</h1>"
-                "<p>Only you (logged in) can see this. Screenshot it.</p>"
-                "<pre style='white-space:pre-wrap;background:#111;color:#0f0;"
-                "padding:14px;font-size:13px'>" +
-                tb.replace("&", "&amp;").replace("<", "&lt;") + "</pre>"), 500
-    return ("<h1>Internal Server Error</h1><p>The server encountered an internal "
-            "error and was unable to complete your request.</p>"), 500
-# ------------------------------------------------------- end RND_DEBUG_V1
 
 
 
