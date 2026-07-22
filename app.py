@@ -5354,6 +5354,32 @@ if not any(str(r.rule) == "/rnd/rebuild" for r in app.url_map.iter_rules()):
 
 
 
+# ---------------------------------------------------------------------------
+# RND_DEBUG_V1 -- show the real traceback on /rnd routes to logged-in admins.
+# Diagnostic only. Remove after the /rnd/<id> 500 is fixed.
+# ---------------------------------------------------------------------------
+import traceback as _rnddbg_tb
+
+
+@app.errorhandler(500)
+def _rnddbg_500(_e):
+    try:
+        p = request.path or ""
+    except Exception:
+        p = ""
+    if p.startswith("/rnd") and session.get("logged_in"):
+        tb = _rnddbg_tb.format_exc()
+        return ("<h1>R&amp;D debug -- real error</h1>"
+                "<p>Only you (logged in) can see this. Screenshot it.</p>"
+                "<pre style='white-space:pre-wrap;background:#111;color:#0f0;"
+                "padding:14px;font-size:13px'>" +
+                tb.replace("&", "&amp;").replace("<", "&lt;") + "</pre>"), 500
+    return ("<h1>Internal Server Error</h1><p>The server encountered an internal "
+            "error and was unable to complete your request.</p>"), 500
+# ------------------------------------------------------- end RND_DEBUG_V1
+
+
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
