@@ -4910,7 +4910,7 @@ for _sc, _ss in _SHORT_SOURCES.items():
 # --- end short ad links ---
 
 # ---------------------------------------------------------------------------
-# RND_MODULE_V1 -- Research & Development  (RND_DICTFIX_V1 applied)
+# RND_MODULE_V1 -- Research & Development  (RND_PYRAMID_V1 applied)  (RND_DICTFIX_V1 applied)
 # Small problems take the decision path, large ones take the research path.
 # Admin-only (session['logged_in']) + RND_CODE passcode. 404 to everyone else.
 # ---------------------------------------------------------------------------
@@ -5009,6 +5009,15 @@ def _rnd_init():
         completed_at DATETIME,
         INDEX (problem_id)
     )""")
+    cur.execute("""CREATE TABLE IF NOT EXISTS rnd_config (
+        k VARCHAR(50) PRIMARY KEY,
+        v VARCHAR(255)
+    )""")
+    try:
+        cur.execute("INSERT IGNORE INTO rnd_config (k, v) VALUES ('passcode', %s)",
+                    ("6968",))
+    except Exception:
+        pass
     conn.commit()
     cur.close()
     conn.close()
@@ -5038,10 +5047,51 @@ def _rnd_gate_page():
     return _rnd_style() + _rnd_nav() + ''.join(b)
 
 
+def _rnd_get_code():
+    """Passcode from rnd_config; falls back to the RND_CODE env var."""
+    _rnd_init()
+    val = None
+    try:
+        conn = _rnd_conn()
+        cur = conn.cursor()
+        cur.execute("SELECT v FROM rnd_config WHERE k='passcode'")
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+        if row:
+            try:
+                val = row["v"]
+            except Exception:
+                val = list(row.values())[0]
+    except Exception:
+        val = None
+    if val:
+        return str(val).strip()
+    return _rnd_os.environ.get("RND_CODE", "")
+
+
+def _rnd_setcode():
+    if not _rnd_is_admin():
+        return _RND_404
+    if not _rnd_unlocked():
+        return redirect("/rnd")
+    _rnd_init()
+    newcode = (request.form.get("newcode") or "").strip()
+    if not newcode:
+        return redirect("/rnd?badnew=1")
+    conn = _rnd_conn()
+    cur = conn.cursor()
+    cur.execute("REPLACE INTO rnd_config (k, v) VALUES ('passcode', %s)", (newcode,))
+    conn.commit()
+    cur.close()
+    conn.close()
+    return redirect("/rnd?changed=1")
+
+
 def _rnd_unlock():
     if not _rnd_is_admin():
         return _RND_404
-    expected = _rnd_os.environ.get("RND_CODE", "")
+    expected = _rnd_get_code()
     supplied = (request.form.get("code") or "").strip()
     if expected and supplied == expected:
         session["rnd_ok"] = True
@@ -5113,6 +5163,17 @@ def _rnd_list():
                 'style="width:100%;padding:8px"></p>')
     body.append('<p><label>Review on: <input type="date" name="review_date"></label></p>')
     body.append('<p><button type="submit" class="btn">Run triage</button></p></form>')
+    body.append('<h2 style="margin-top:36px">Passcode</h2>')
+    if request.args.get("changed"):
+        body.append('<p style="color:#127a2e"><b>Passcode changed.</b></p>')
+    if request.args.get("badnew"):
+        body.append('<p style="color:#b00"><b>Passcode cannot be blank.</b></p>')
+    body.append('<p style="color:#666">Shared by everyone who uses this area. '
+                'Changing it takes effect immediately.</p>')
+    body.append('<form method="POST" action="/rnd/setcode" style="max-width:340px">')
+    body.append('<p><input name="newcode" placeholder="New passcode" '
+                'style="width:100%;padding:8px"></p>')
+    body.append('<p><button type="submit" class="btn">Change passcode</button></p></form>')
     return _rnd_style() + _rnd_nav() + ''.join(body)
 
 
@@ -5294,7 +5355,13 @@ if callable(globals().get("admin_nav")):
                 return out
             if 'href="/rnd"' in out:
                 return out
-            link = '<a href="/rnd">R&amp;D</a>'
+            link = ('<a href="/rnd" style="padding:0 10px">'
+                    '<svg width="17" height="13" viewBox="0 0 16 12" '
+                    'style="vertical-align:middle">'
+                    '<polygon points="7,1 9,1 9,3 10.5,3 10.5,5 12,5 12,7 '
+                    '13.5,7 13.5,9 15,9 15,11 1,11 1,9 2.5,9 2.5,7 4,7 '
+                    '4,5 5.5,5 5.5,3 7,3" fill="currentColor"/>'
+                    '</svg></a>')
             if "</nav>" in out:
                 return out.replace("</nav>", link + "</nav>", 1)
             return out + link
@@ -5305,6 +5372,7 @@ if callable(globals().get("admin_nav")):
 for _rnd_rule, _rnd_ep, _rnd_fn, _rnd_m in [
     ("/rnd", "rnd_list", _rnd_list, ["GET"]),
     ("/rnd/unlock", "rnd_unlock", _rnd_unlock, ["POST"]),
+    ("/rnd/setcode", "rnd_setcode", _rnd_setcode, ["POST"]),
     ("/rnd/new", "rnd_new", _rnd_new, ["POST"]),
     ("/rnd/<int:pid>", "rnd_detail", _rnd_detail, ["GET"]),
     ("/rnd/<int:pid>/step", "rnd_step", _rnd_step, ["POST"]),
