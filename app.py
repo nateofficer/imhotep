@@ -5216,6 +5216,78 @@ def _rnd_new():
     return redirect("/rnd/" + str(pid))
 
 
+# --- RND_PROMPTS_V1: generic guiding questions per step --------------------
+_RND_PROMPTS = {
+    # research path
+    "Define the problem": [
+        "What exactly is the decision or question, in one sentence?",
+        "Who is affected, and what happens if you do nothing?",
+        "What would a good answer let you do that you cannot do now?",
+    ],
+    "Literature review": [
+        "What do you already know, and how do you know it?",
+        "Who has faced this before -- competitors, past jobs, industry norms?",
+        "What sources or numbers can you pull instead of guessing?",
+    ],
+    "Design / hypothesis": [
+        "What is your best guess at the answer right now?",
+        "What would prove that guess wrong?",
+        "What will you measure, and what counts as success?",
+    ],
+    "Collect data": [
+        "What specific numbers or facts do you need to gather?",
+        "Where does each one come from, and how long will it take?",
+        "What is the smallest sample that would still be convincing?",
+    ],
+    "Analyze data": [
+        "What does the data actually say -- not what you hoped?",
+        "Does it support or kill your hypothesis?",
+        "What surprised you, and what still does not add up?",
+    ],
+    "Conclusions and recommendations": [
+        "In one sentence, what should be done?",
+        "What is the cost, the risk, and the expected payoff?",
+        "What would make you reverse this recommendation?",
+    ],
+    "Implement": [
+        "What are the first three concrete steps, and who does each?",
+        "What is the deadline, and what is the budget?",
+        "How will you know it is actually done?",
+    ],
+    "Evaluate the result": [
+        "What is the metric now, versus the baseline you wrote down?",
+        "Did it work, fail, or come out unclear -- and why?",
+        "What would you do differently next time?",
+    ],
+    # decision path (shares the last two names with research above)
+    "Identify the problem": [
+        "What is the problem in one sentence?",
+        "Is this urgent, or does it just feel urgent?",
+        "What is the real cost of leaving it alone?",
+    ],
+    "Generate alternatives": [
+        "List at least three options, including 'do nothing'.",
+        "What is the fast/cheap option and the thorough option?",
+        "What has worked for a similar problem before?",
+    ],
+    "Evaluate and select": [
+        "What matters most here -- cost, speed, quality, risk?",
+        "Which option best fits that, and what does it trade away?",
+        "Why this one over the runner-up?",
+    ],
+}
+
+
+def _rnd_prompt_html(step_name):
+    qs = _RND_PROMPTS.get(step_name)
+    if not qs:
+        return ""
+    items = "".join("<li>" + _rnd_esc(q) + "</li>" for q in qs)
+    return ('<ul style="margin:6px 0 8px 0;padding-left:20px;color:#666;'
+            'font-size:13px">' + items + "</ul>")
+# --- end RND_PROMPTS_V1 ----------------------------------------------------
+
+
 def _rnd_detail(pid):
     if not _rnd_is_admin():
         return _RND_404
@@ -5261,6 +5333,7 @@ def _rnd_detail(pid):
                  ';padding:12px;margin:10px 0">')
         b.append('<b>' + str(no) + '. ' + ('&#10004; ' if done else '') +
                  _rnd_esc(name) + '</b>')
+        b.append(_rnd_prompt_html(name))
         b.append('<form method="POST" action="/rnd/' + str(pid) + '/step">')
         b.append('<input type="hidden" name="step_no" value="' + str(no) + '">')
         b.append('<textarea name="content" rows="3" style="width:100%;padding:8px">' +
