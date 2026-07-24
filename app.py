@@ -2813,6 +2813,55 @@ def _source_funnel_html():
             '<p class="form-note">Tag your ads: caseyscleaning.net/quote?utm_source=facebook</p></div>')
 
 
+# --- CRM_EMAIL_BUTTONS_V1: copy / email-all buttons -------------------------
+import html as _crmeb_html
+
+
+def _crm_email_buttons(leads):
+    """Two buttons (copy all emails, email all in Gmail) from the shown leads."""
+    emails = []
+    for _ld in (leads or []):
+        try:
+            _e = _ld.get("email")
+        except AttributeError:
+            _e = None
+        if _e:
+            _e = str(_e).strip()
+            if _e and "@" in _e and _e not in emails:
+                emails.append(_e)
+    n = len(emails)
+    if n == 0:
+        return ('<p style="margin:10px 0;color:#888">'
+                'No email addresses among these leads.</p>')
+    joined = ",".join(emails)
+    j_attr = _crmeb_html.escape(joined, quote=True)
+    gmail = ("https://mail.google.com/mail/?view=cm&fs=1&bcc=" +
+             _crmeb_html.escape(joined, quote=True) +
+             "&su=" + _crmeb_html.escape("A quote from Casey's Cleaning", quote=True))
+    return (
+        '<div style="margin:10px 0">'
+        '<span id="crmeb-emails" style="display:none">' + j_attr + '</span>'
+        '<button type="button" class="btn" onclick="crmebCopy()" '
+        'style="margin-right:8px">Copy emails (' + str(n) + ')</button>'
+        '<a class="btn" href="' + gmail + '" target="_blank" '
+        'rel="noopener">Email all in Gmail (' + str(n) + ')</a>'
+        '<span id="crmeb-msg" style="margin-left:10px;color:#127a2e"></span>'
+        '<script>'
+        'function crmebCopy(){'
+        'var t=document.getElementById("crmeb-emails").textContent;'
+        'navigator.clipboard.writeText(t).then(function(){'
+        'document.getElementById("crmeb-msg").textContent="Copied "+'
+        't.split(",").length+" emails";},function(){'
+        'var ta=document.createElement("textarea");ta.value=t;'
+        'document.body.appendChild(ta);ta.select();'
+        'try{document.execCommand("copy");'
+        'document.getElementById("crmeb-msg").textContent="Copied";}'
+        'catch(e){}document.body.removeChild(ta);});}'
+        '</script>'
+        '</div>')
+# --- end CRM_EMAIL_BUTTONS_V1 ----------------------------------------------
+
+
 @app.route('/crm')
 @login_required
 def crm_list():
@@ -2845,6 +2894,7 @@ def crm_list():
     html = STYLE + admin_nav() + '<h1>CRM - Leads</h1>'
     html += filter_links
     html += '<p><a class="btn btn-success" href="/crm/new">+ Add Lead</a></p>'
+    html += _crm_email_buttons(leads)  # CRM_EMAIL_BUTTONS_V1
     html += _source_funnel_html()
 
     if not leads:
