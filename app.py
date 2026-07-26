@@ -5555,6 +5555,282 @@ for _snapx_slug, _snapx_src in (('sc', 'snapchat'), ('x', 'x')):
 
 
 
+# ---------------------------------------------------------------------------
+# CALENDAR_V1 -- manual unified calendar for interviews + jobs
+# ---------------------------------------------------------------------------
+import calendar as _calv_cal
+import html as _calv_html
+from datetime import date as _calv_date, datetime as _calv_dt
+
+_CALV_READY = {"done": False}
+
+
+def _calv_conn():
+    return get_db()
+
+
+def _calv_style():
+    return globals().get("STYLE", "")
+
+
+def _calv_nav():
+    fn = globals().get("admin_nav")
+    try:
+        return fn() if callable(fn) else ""
+    except Exception:
+        return ""
+
+
+def _calv_esc(v):
+    return _calv_html.escape("" if v is None else str(v))
+
+
+def _calv_init():
+    if _CALV_READY["done"]:
+        return
+    conn = _calv_conn()
+    cur = conn.cursor()
+    cur.execute("""CREATE TABLE IF NOT EXISTS calendar_events (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        kind VARCHAR(20),
+        title VARCHAR(255),
+        event_date DATE,
+        event_time VARCHAR(20),
+        notes TEXT,
+        created_at DATETIME
+    )""")
+    conn.commit()
+    cur.close()
+    conn.close()
+    _CALV_READY["done"] = True
+
+
+def _calv_guard():
+    return bool(session.get("logged_in"))
+
+
+def _calv_month_events(year, month):
+    _calv_init()
+    conn = _calv_conn()
+    cur = conn.cursor()
+    cur.execute("""SELECT id, kind, title, event_date, event_time, notes
+                   FROM calendar_events
+                   WHERE YEAR(event_date)=%s AND MONTH(event_date)=%s
+                   ORDER BY event_date, event_time""", (year, month))
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    by_day = {}
+    for r in rows:
+        d = r["event_date"]
+        try:
+            day = d.day
+        except AttributeError:
+            # string date YYYY-MM-DD
+            day = int(str(d)[8:10])
+        by_day.setdefault(day, []).append(r)
+    return by_day
+
+
+def _calv_calendar():
+    if not _calv_guard():
+        return redirect("/login")
+    today = _calv_date.today()
+    try:
+        year = int(request.args.get("y", today.year))
+        month = int(request.args.get("m", today.month))
+    except (TypeError, ValueError):
+        year, month = today.year, today.month
+    if month < 1:
+        month, year = 12, year - 1
+    if month > 12:
+        month, year = 1, year + 1
+
+    by_day = _calv_month_events(year, month)
+    cal = _calv_cal.Calendar(firstweekday=6)  # Sunday first
+    weeks = cal.monthdayscalendar(year, month)
+    month_name = _calv_cal.month_name[month]
+
+    prev_m, prev_y = (month - 1, year) if month > 1 else (12, year - 1)
+    next_m, next_y = (month + 1, year) if month < 12 else (1, year + 1)
+
+    b = [_calv_style(), _calv_nav()]
+    b.append('<h1>Calendar</h1>')
+    b.append('<div style="margin-bottom:12px">'
+             '<a class="btn" href="/calendar?y=%d&m=%d">&larr; Prev</a> '
+             '<b style="margin:0 14px;font-size:18px">%s %d</b> '
+             '<a class="btn" href="/calendar?y=%d&m=%d">Next &rarr;</a> '
+             '<a class="btn" href="/calendar" style="margin-left:14px">Today</a>'
+             '</div>' % (prev_y, prev_m, month_name, year, next_y, next_m))
+
+    # add-event form
+    b.append('<form method="POST" action="/calendar/add" '
+             'style="margin-bottom:16px;padding:12px;border:1px solid #ddd;'
+             'max-width:720px">')
+    b.append('<b>Add event</b><br>')
+    b.append('<select name="kind" style="padding:6px;margin:6px 6px 6px 0">'
+             '<option value="interview">Interview</option>'
+             '<option value="job">Job</option></select>')
+    b.append('<input name="title" placeholder="Title" required '
+             'style="padding:6px;margin:6px 6px 6px 0">')
+    b.append('<input type="date" name="event_date" required '
+             'style="padding:6px;margin:6px 6px 6px 0" value="%d-%02d-01">' % (year, month))
+    b.append('<input type="time" name="event_time" '
+             'style="padding:6px;margin:6px 6px 6px 0">')
+    b.append('<input name="notes" placeholder="Notes" '
+             'style="padding:6px;margin:6px 6px 6px 0;width:200px">')
+    b.append('<button type="submit" class="btn">Add</button>')
+    b.append('</form>')
+
+    # legend
+    b.append('<p style="font-size:13px">'
+             '<span style="background:#2d6cdf;color:#fff;padding:2px 8px;'
+             'border-radius:4px">Interview</span> &nbsp; '
+             '<span style="background:#27ae60;color:#fff;padding:2px 8px;'
+             'border-radius:4px">Job</span></p>')
+
+    # grid
+    b.append('<table style="width:100%;border-collapse:collapse;table-layout:fixed">')
+    b.append('<tr>' + "".join(
+        '<th style="border:1px solid #ddd;padding:6px;background:#f4f4f4">' + d + '</th>'
+        for d in ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]) + '</tr>')
+    for week in weeks:
+        b.append('<tr>')
+        for day in week:
+            if day == 0:
+                b.append('<td style="border:1px solid #eee;height:96px;'
+                         'background:#fafafa;vertical-align:top"></td>')
+                continue
+            is_today = (day == today.day and month == today.month and year == today.year)
+            daybg = "#fffbe6" if is_today else "#fff"
+            cell = ['<td style="border:1px solid #ddd;height:96px;vertical-align:top;'
+                    'background:%s;padding:3px;font-size:12px">' % daybg]
+            cell.append('<div style="color:#888;font-weight:bold">%d</div>' % day)
+            for ev in by_day.get(day, []):
+                color = "#2d6cdf" if ev["kind"] == "interview" else "#27ae60"
+                t = (_calv_esc(ev["event_time"]) + " ") if ev["event_time"] else ""
+                cell.append(
+                    '<a href="/calendar/edit/%d" '
+                    'style="display:block;background:%s;color:#fff;'
+                    'border-radius:3px;padding:1px 4px;margin:2px 0;'
+                    'text-decoration:none;overflow:hidden;white-space:nowrap;'
+                    'text-overflow:ellipsis" title="%s">%s%s</a>' % (
+                        ev["id"], color,
+                        _calv_esc((ev["title"] or "") + " " + (ev["notes"] or "")),
+                        t, _calv_esc(ev["title"])))
+            cell.append('</td>')
+            b.append("".join(cell))
+        b.append('</tr>')
+    b.append('</table>')
+    return "".join(b)
+
+
+def _calv_add():
+    if not _calv_guard():
+        return redirect("/login")
+    _calv_init()
+    f = request.form
+    conn = _calv_conn()
+    cur = conn.cursor()
+    cur.execute("""INSERT INTO calendar_events
+        (kind, title, event_date, event_time, notes, created_at)
+        VALUES (%s,%s,%s,%s,%s,%s)""",
+        (f.get("kind", "job"), f.get("title", "").strip(),
+         f.get("event_date") or None, f.get("event_time") or "",
+         f.get("notes", ""), _calv_dt.now()))
+    conn.commit()
+    cur.close()
+    conn.close()
+    ed = f.get("event_date") or ""
+    q = ""
+    if len(ed) >= 7:
+        q = "?y=%s&m=%s" % (ed[0:4], int(ed[5:7]))
+    return redirect("/calendar" + q)
+
+
+def _calv_edit(eid):
+    if not _calv_guard():
+        return redirect("/login")
+    _calv_init()
+    conn = _calv_conn()
+    cur = conn.cursor()
+    if request.method == "POST":
+        f = request.form
+        cur.execute("""UPDATE calendar_events
+            SET kind=%s, title=%s, event_date=%s, event_time=%s, notes=%s
+            WHERE id=%s""",
+            (f.get("kind", "job"), f.get("title", "").strip(),
+             f.get("event_date") or None, f.get("event_time") or "",
+             f.get("notes", ""), eid))
+        conn.commit()
+        cur.close()
+        conn.close()
+        ed = request.form.get("event_date") or ""
+        q = ""
+        if len(ed) >= 7:
+            q = "?y=%s&m=%s" % (ed[0:4], int(ed[5:7]))
+        return redirect("/calendar" + q)
+    cur.execute("""SELECT id, kind, title, event_date, event_time, notes
+                   FROM calendar_events WHERE id=%s""", (eid,))
+    ev = cur.fetchone()
+    cur.close()
+    conn.close()
+    if not ev:
+        return redirect("/calendar")
+    ed = ev["event_date"]
+    try:
+        ed = ed.strftime("%Y-%m-%d")
+    except AttributeError:
+        ed = str(ed)[:10]
+    b = [_calv_style(), _calv_nav(), '<h1>Edit event</h1>']
+    b.append('<form method="POST" action="/calendar/edit/%d" style="max-width:420px">' % eid)
+    sel_i = " selected" if ev["kind"] == "interview" else ""
+    sel_j = " selected" if ev["kind"] == "job" else ""
+    b.append('<p><select name="kind" style="padding:6px">'
+             '<option value="interview"%s>Interview</option>'
+             '<option value="job"%s>Job</option></select></p>' % (sel_i, sel_j))
+    b.append('<p><input name="title" value="%s" style="width:100%%;padding:6px" required></p>'
+             % _calv_esc(ev["title"]))
+    b.append('<p><input type="date" name="event_date" value="%s" style="padding:6px"></p>' % ed)
+    b.append('<p><input type="time" name="event_time" value="%s" style="padding:6px"></p>'
+             % _calv_esc(ev["event_time"]))
+    b.append('<p><textarea name="notes" style="width:100%%;padding:6px" rows="3">%s</textarea></p>'
+             % _calv_esc(ev["notes"]))
+    b.append('<p><button type="submit" class="btn">Save</button> '
+             '<a class="btn" href="/calendar">Cancel</a></p>')
+    b.append('</form>')
+    b.append('<form method="POST" action="/calendar/delete/%d" '
+             'onsubmit="return confirm(\'Delete this event?\')">' % eid)
+    b.append('<button type="submit" class="btn" style="background:#c0392b">'
+             'Delete</button></form>')
+    return "".join(b)
+
+
+def _calv_delete(eid):
+    if not _calv_guard():
+        return redirect("/login")
+    _calv_init()
+    conn = _calv_conn()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM calendar_events WHERE id=%s", (eid,))
+    conn.commit()
+    cur.close()
+    conn.close()
+    return redirect("/calendar")
+
+
+for _calv_rule, _calv_ep, _calv_fn, _calv_m in [
+    ("/calendar", "calv_calendar", _calv_calendar, ["GET"]),
+    ("/calendar/add", "calv_add", _calv_add, ["POST"]),
+    ("/calendar/edit/<int:eid>", "calv_edit", _calv_edit, ["GET", "POST"]),
+    ("/calendar/delete/<int:eid>", "calv_delete", _calv_delete, ["POST"]),
+]:
+    if not any(str(_r.rule) == _calv_rule for _r in app.url_map.iter_rules()):
+        app.add_url_rule(_calv_rule, _calv_ep, _calv_fn, methods=_calv_m)
+# ------------------------------------------------------- end CALENDAR_V1
+
+
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
