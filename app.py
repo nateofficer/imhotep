@@ -1404,6 +1404,26 @@ def candidate_interview(candidate_id):
                 (candidate_id, interviewer, interview_date, _json.dumps(answers), _json.dumps(scores), total, recommendation, notes)
             )
         conn.commit()
+        try:
+            _iv_name = None
+            _ivc = get_db()
+            _ivcur = _ivc.cursor()
+            _ivcur.execute("SELECT * FROM candidates WHERE id = %s", (candidate_id,))
+            _ivrow = _ivcur.fetchone()
+            _ivc.close()
+            if _ivrow:
+                for _k in ('name','full_name','first_name','applicant_name','email'):
+                    try:
+                        _v = _ivrow[_k]
+                    except Exception:
+                        _v = None
+                    if _v:
+                        _iv_name = _v
+                        break
+            _iv_cal_sync(candidate_id, _iv_name, interview_date)
+        except Exception:
+            pass
+
         conn.close()
         return redirect('/applications')
 
@@ -5830,6 +5850,56 @@ for _calv_rule, _calv_ep, _calv_fn, _calv_m in [
     if not any(str(_r.rule) == _calv_rule for _r in app.url_map.iter_rules()):
         app.add_url_rule(_calv_rule, _calv_ep, _calv_fn, methods=_calv_m)
 # ------------------------------------------------------- end CALENDAR_V1
+
+
+
+# ---------------------------------------------------------------------------
+# IV_TO_CAL_V1 -- mirror a saved interview date onto the Imhotep calendar
+# ---------------------------------------------------------------------------
+def _iv_cal_sync(candidate_id, name, date_str):
+    """Create/update a blue 'Interview: <name>' event for this candidate.
+    No-op if date_str is falsy. Matched by [iv:<id>] tag in notes so re-saving
+    updates instead of duplicating."""
+    if not date_str:
+        return
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("""CREATE TABLE IF NOT EXISTS calendar_events (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            kind VARCHAR(20),
+            title VARCHAR(255),
+            event_date DATE,
+            event_time VARCHAR(20),
+            notes TEXT,
+            created_at DATETIME
+        )""")
+        tag = "[iv:" + str(candidate_id) + "]"
+        title = "Interview: " + (name or ("Candidate " + str(candidate_id)))
+        cur.execute("SELECT id FROM calendar_events WHERE notes LIKE %s LIMIT 1",
+                    ("%" + tag + "%",))
+        row = cur.fetchone()
+        if row:
+            try:
+                _eid = row["id"]
+            except Exception:
+                _eid = list(row.values())[0]
+            cur.execute("""UPDATE calendar_events
+                SET title=%s, event_date=%s WHERE id=%s""",
+                (title, date_str, _eid))
+        else:
+            import datetime as _iv_dt
+            cur.execute("""INSERT INTO calendar_events
+                (kind, title, event_date, event_time, notes, created_at)
+                VALUES ('interview', %s, %s, '', %s, %s)""",
+                (title, date_str, tag, _iv_dt.datetime.now()))
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception:
+        # never let a calendar hiccup break saving the interview
+        pass
+# ------------------------------------------------------- end IV_TO_CAL_V1
 
 
 
