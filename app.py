@@ -3486,11 +3486,11 @@ def render_quote_page(source):
   <div class="card">
     <h2>Type of cleaning</h2>
     <p class="sub">Pick what fits your needs</p>
-    <div class="opts" id="types">
-      <div class="opt sel" data-v="standard"><b>Standard</b><span>Regular upkeep</span></div>
-      <div class="opt" data-v="deep"><b>Deep Clean</b><span>Top to bottom</span></div>
-      <div class="opt" data-v="moveout"><b>Move-Out</b><span>Ready for new</span></div>
-      <div class="opt" data-v="airbnb"><b>Airbnb</b><span>Rental turnover</span></div>
+    <div class="opts" id="types"><!-- QUOTE_PHOTOS_V1 -->
+      <div class="opt sel" data-v="standard"><img src="https://drive.google.com/thumbnail?id=1qpO4ZFRXdKGfXdPtax5IzzGvx9DtWkK8&sz=w1000" alt="" loading="lazy" style="width:100%;height:90px;object-fit:cover;border-radius:8px;margin-bottom:6px;display:block" onerror="this.style.display='none'"><b>Standard</b><span>Regular upkeep</span></div>
+      <div class="opt" data-v="deep"><img src="https://drive.google.com/thumbnail?id=1o9cF-uQB46Q4vHkvMlrIkr7HRIkmOGlk&sz=w1000" alt="" loading="lazy" style="width:100%;height:90px;object-fit:cover;border-radius:8px;margin-bottom:6px;display:block" onerror="this.style.display='none'"><b>Deep Clean</b><span>Top to bottom</span></div>
+      <div class="opt" data-v="moveout"><img src="https://drive.google.com/thumbnail?id=11Ac_4QcqdzKNyXhtcQH8QhXdJWEi11Sa&sz=w1000" alt="" loading="lazy" style="width:100%;height:90px;object-fit:cover;border-radius:8px;margin-bottom:6px;display:block" onerror="this.style.display='none'"><b>Move-Out</b><span>Ready for new</span></div>
+      <div class="opt" data-v="airbnb"><img src="https://drive.google.com/thumbnail?id=1naqHHAFwmYxO76LyrzFTLjQgUjmQpoeY&sz=w1000" alt="" loading="lazy" style="width:100%;height:90px;object-fit:cover;border-radius:8px;margin-bottom:6px;display:block" onerror="this.style.display='none'"><b>Airbnb</b><span>Rental turnover</span></div>
     </div>
   </div>
 
