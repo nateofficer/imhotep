@@ -563,7 +563,9 @@ def home():
         <!-- PHOTO_1 --><div class="lp-photo"><div class="lp-ph">Your after-photo #1<br>(swap in later)</div></div>
         <!-- PHOTO_2 --><div class="lp-photo"><div class="lp-ph">Your after-photo #2<br>(swap in later)</div></div>
         <!-- PHOTO_3 --><div class="lp-photo"><div class="lp-ph">Your after-photo #3<br>(swap in later)</div></div>
-      </div>
+      </div><!-- STATIC_TIP_V1 -->
+        <div style="max-width:900px;margin:18px auto;padding:16px 20px;background:#eef4ff;border:1px solid #d3e0f5;border-radius:12px;text-align:center"><div style="font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#2d6cdf;margin-bottom:4px">&#128161; Cleaning Tip</div><div style="font-size:16px;color:#33475b;line-height:1.5">Microfiber cloths trap more dust than cotton and need only water &mdash; skip the spray on glass and mirrors for a streak-free shine.</div></div>
+
 
       <div class="lp-services">
         <div class="lp-svc"><b>Standard</b><span>Regular upkeep</span></div>
