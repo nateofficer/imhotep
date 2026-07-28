@@ -4221,6 +4221,7 @@ JOB_STATUS_COLORS = {
     'rescheduled':          '#95a5a6',
     'cancelled':            '#c0392b',
     'pending_confirmation': '#9b59b6',
+    'interview':            '#2d6cdf',
 }
 
 
@@ -4266,6 +4267,30 @@ def schedule_calendar():
     for j in jobs:
         d = str(j['scheduled_date'])
         jobs_by_date.setdefault(d, []).append(j)
+    # --- interviews from calendar_events, painted onto this same grid ---
+    _iconn = get_db()
+    _icur = _iconn.cursor()
+    try:
+        _icur.execute("SELECT * FROM calendar_events WHERE kind='interview'")
+        _ivs = _icur.fetchall()
+    except Exception:
+        _ivs = []
+    _iconn.close()
+    for _iv in _ivs:
+        _d = str(_iv['event_date'])
+        jobs_by_date.setdefault(_d, []).append({
+            'id': 900000 + int(_iv['id']),      # offset so it never collides with a real job id
+            'customer_id': None,
+            'scheduled_date': _iv['event_date'],
+            'scheduled_time': _iv.get('event_time'),
+            'service_type': 'Interview',
+            'status': 'interview',              # -> blue via JOB_STATUS_COLORS
+            'recurrence_rule': 'one_time',
+            'price': None,
+            'notes': _iv.get('notes'),
+            'cust_first': 'Interview:',
+            'cust_last': (_iv['title'] or 'Candidate'),
+        })
     if view == 'month':
         prev_m = month - 1 if month > 1 else 12
         prev_y = year if month > 1 else year - 1
