@@ -2733,6 +2733,7 @@ def trainee_onboarding_status(trainee_id):
 def trainee_onboarding():
     conn = get_db()
     cursor = conn.cursor()
+    trainee_id = session.get('trainee_id')
     cursor.execute('''
         SELECT trainees.*, candidates.first_name, candidates.last_name
         FROM trainees LEFT JOIN candidates ON trainees.candidate_id = candidates.id
