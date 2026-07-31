@@ -192,6 +192,22 @@ def init_db():
         except Exception:
             pass
 
+    # --- background check columns (safe if they already exist) ---
+    try:
+        cursor.execute('SELECT background_check_status FROM trainees LIMIT 1')
+    except Exception:
+        try:
+            cursor.execute("ALTER TABLE trainees ADD COLUMN background_check_status VARCHAR(20) DEFAULT 'pending'")
+        except Exception:
+            pass
+    try:
+        cursor.execute('SELECT background_check_date FROM trainees LIMIT 1')
+    except Exception:
+        try:
+            cursor.execute('ALTER TABLE trainees ADD COLUMN background_check_date DATETIME')
+        except Exception:
+            pass
+
     # --- seed the Cleaning Procedures Test once ---
     try:
         cursor.execute('SELECT id FROM training_modules WHERE title = %s', ('Cleaning Procedures Test',))
@@ -2091,6 +2107,32 @@ def trainee_detail(trainee_id):
         <p class="form-note">Send this code to {t['first_name']} along with the training login URL. They will use their email ({t['email']}) and this code to log in.</p>
     </div>
     '''
+    _bg = (t.get('background_check_status') or 'pending').lower()
+    _bg_date = t.get('background_check_date')
+    _bg_colors = {'cleared': '#27ae60', 'failed': '#c0392b', 'pending': '#f39c12'}
+    _bg_labels = {'cleared': 'CLEARED', 'failed': 'FAILED', 'pending': 'PENDING'}
+    _bg_color = _bg_colors.get(_bg, '#f39c12')
+    _bg_label = _bg_labels.get(_bg, 'PENDING')
+    _bg_date_txt = (' &nbsp;<span style="color:#666;">(set %s)</span>' % _bg_date) if _bg_date else ''
+    html += f'''
+    <div class="application">
+        <h3>Background Check</h3>
+        <p>Status: <span style="background:{_bg_color};color:#fff;padding:3px 10px;border-radius:4px;font-weight:bold;">{_bg_label}</span>{_bg_date_txt}</p>
+        <p class="form-note">Trainee emails their driver's license to <strong>cindy@caseyscleaning.com</strong>. When Cindy replies, set the result here. (No lock yet &mdash; this only records the status.)</p>
+        <form method="POST" action="/trainee/{trainee_id}/set-bgcheck" style="display:inline;">
+            <input type="hidden" name="status" value="cleared">
+            <button type="submit" style="background:#27ae60;color:#fff;border:none;padding:8px 14px;border-radius:4px;cursor:pointer;margin-right:6px;">Mark Cleared</button>
+        </form>
+        <form method="POST" action="/trainee/{trainee_id}/set-bgcheck" style="display:inline;">
+            <input type="hidden" name="status" value="failed">
+            <button type="submit" style="background:#c0392b;color:#fff;border:none;padding:8px 14px;border-radius:4px;cursor:pointer;margin-right:6px;">Mark Failed</button>
+        </form>
+        <form method="POST" action="/trainee/{trainee_id}/set-bgcheck" style="display:inline;">
+            <input type="hidden" name="status" value="pending">
+            <button type="submit" style="background:#95a5a6;color:#fff;border:none;padding:8px 14px;border-radius:4px;cursor:pointer;">Set Pending</button>
+        </form>
+    </div>
+    '''
     _rows = ''
     for _r in _results:
         _sc = _r.get('score')
@@ -2106,6 +2148,23 @@ def trainee_detail(trainee_id):
     else:
         html += '<div class="application"><h3>Training Results (management only)</h3><p class="form-note">No test results yet.</p></div>'
     return html
+
+
+@app.route('/trainee/<int:trainee_id>/set-bgcheck', methods=['POST'])
+@login_required
+def set_trainee_bgcheck(trainee_id):
+    status = request.form.get('status', '')
+    if status not in ('pending', 'cleared', 'failed'):
+        return redirect('/trainee/%d' % trainee_id)
+    conn = get_db()
+    cursor = conn.cursor()
+    if status == 'pending':
+        cursor.execute('UPDATE trainees SET background_check_status=%s, background_check_date=NULL WHERE id=%s', (status, trainee_id))
+    else:
+        cursor.execute('UPDATE trainees SET background_check_status=%s, background_check_date=NOW() WHERE id=%s', (status, trainee_id))
+    conn.commit()
+    conn.close()
+    return redirect('/trainee/%d' % trainee_id)
 
 
 # ============ TRAINEE AUTH ============
