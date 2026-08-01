@@ -2244,9 +2244,38 @@ def my_training():
     required_count = cursor.fetchone()['cnt']
     passed_required = sum(1 for m in modules if m['required'] and progress.get(m['id']) and progress[m['id']]['passed'])
     certified = passed_required >= required_count and required_count > 0
+    cursor.execute("""
+        SELECT
+          SUM(CASE WHEN (d.category IS NULL OR d.category = 'onboarding') THEN 1 ELSE 0 END) AS ob_total,
+          SUM(CASE WHEN (d.category IS NULL OR d.category = 'onboarding') AND td.status NOT IN ('signed','verified') THEN 1 ELSE 0 END) AS ob_unsigned
+        FROM trainee_documents td JOIN documents d ON td.document_id = d.id
+        WHERE td.trainee_id = %s
+    """, (trainee_id,))
+    _ob = cursor.fetchone()
+    _ob_total = (_ob['ob_total'] or 0) if _ob else 0
+    _ob_unsigned = (_ob['ob_unsigned'] or 0) if _ob else 0
+    onboarding_done = (_ob_total > 0 and _ob_unsigned == 0)
+    cursor.execute("""
+        SELECT td.id AS assignment_id, d.title, d.doc_type, d.drive_link, d.file_url, td.status
+        FROM trainee_documents td JOIN documents d ON td.document_id = d.id
+        WHERE td.trainee_id = %s AND d.category = 'training'
+        ORDER BY d.title
+    """, (trainee_id,))
+    _training_docs = cursor.fetchall()
     conn.close()
 
     name = trainee['first_name'] if trainee else 'Trainee'
+
+    if not onboarding_done:
+        html = STYLE + trainee_nav() + f'<h1>Welcome, {name}!</h1>'
+        html += ('<div class="info" style="border-left:4px solid #f39c12;">'
+                 '<h2 style="margin-top:0;">Finish your onboarding first</h2>'
+                 '<p>Training unlocks once you have completed all of your onboarding documents. '
+                 'Go to <a href="/trainee/documents">My Documents</a> to review and sign them.</p>'
+                 '<p class="form-note">If you do not see any documents there yet, your manager has not '
+                 'assigned them &mdash; please check with them.</p>'
+                 '</div>')
+        return html
 
     html = STYLE + trainee_nav() + f'<h1>Welcome, {name}!</h1>'
 
@@ -2285,6 +2314,22 @@ def my_training():
                 <a class="btn" href="/training/module/{m['id']}">{btn_text}</a>
             </div>
             '''
+
+    if _training_docs:
+        html += '<h2>Training Documents</h2>'
+        for _d in _training_docs:
+            _link = _d.get('drive_link') or _d.get('file_url') or ''
+            if _d['status'] in ('signed', 'verified'):
+                _st = '<span class="status-label status-passed">Signed</span>'
+            else:
+                _st = '<span class="status-label status-not-started">Action needed</span>'
+            html += '<div class="module-card"><h2>' + (_d['title'] or 'Document') + '</h2><p>' + _st + '</p>'
+            if _link:
+                html += '<a class="btn" href="' + _link + '" target="_blank" style="background:#27ae60;">View</a> '
+            if _d['doc_type'] == 'signable' and _d['status'] not in ('signed', 'verified'):
+                html += '<a class="btn" href="/trainee/documents/sign/' + str(_d['assignment_id']) + '">Sign</a>'
+            html += '</div>'
+
     return html
 
 
@@ -4999,7 +5044,7 @@ def trainee_documents():
                td.status, td.signed_date, td.verified_date, td.verified_by
         FROM trainee_documents td
         JOIN documents d ON td.document_id = d.id
-        WHERE td.trainee_id = %s
+        WHERE td.trainee_id = %s AND (d.category IS NULL OR d.category = 'onboarding')
         ORDER BY d.title
     """, (trainee_id,))
     docs = cur.fetchall()
