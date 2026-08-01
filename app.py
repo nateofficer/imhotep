@@ -2254,7 +2254,9 @@ def my_training():
     _ob = cursor.fetchone()
     _ob_total = (_ob['ob_total'] or 0) if _ob else 0
     _ob_unsigned = (_ob['ob_unsigned'] or 0) if _ob else 0
-    onboarding_done = (_ob_total > 0 and _ob_unsigned == 0)
+    _docs_done = (_ob_total > 0 and _ob_unsigned == 0)
+    _bg_cleared = bool(trainee) and (str(trainee.get('background_check_status') or '').lower() == 'cleared')
+    onboarding_done = _docs_done and _bg_cleared
     cursor.execute("""
         SELECT td.id AS assignment_id, d.title, d.doc_type, d.drive_link, d.file_url, td.status
         FROM trainee_documents td JOIN documents d ON td.document_id = d.id
@@ -2268,12 +2270,13 @@ def my_training():
 
     if not onboarding_done:
         html = STYLE + trainee_nav() + f'<h1>Welcome, {name}!</h1>'
+        _need_docs = '' if _docs_done else '<p>&#8226; Sign all of your onboarding documents in <a href="/trainee/documents">My Documents</a>.</p>'
+        _need_bg = '' if _bg_cleared else '<p>&#8226; Your background check must be completed and cleared. If you have not already, email a photo of your ID to <strong>cindy@caseyscleaning.com</strong>.</p>'
         html += ('<div class="info" style="border-left:4px solid #f39c12;">'
                  '<h2 style="margin-top:0;">Finish your onboarding first</h2>'
-                 '<p>Training unlocks once you have completed all of your onboarding documents. '
-                 'Go to <a href="/trainee/documents">My Documents</a> to review and sign them.</p>'
-                 '<p class="form-note">If you do not see any documents there yet, your manager has not '
-                 'assigned them &mdash; please check with them.</p>'
+                 '<p>Your training unlocks once onboarding is complete. Still needed:</p>'
+                 + _need_docs + _need_bg +
+                 '<p class="form-note">Questions? Check with your manager.</p>'
                  '</div>')
         return html
 
