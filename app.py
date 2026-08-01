@@ -208,6 +208,15 @@ def init_db():
         except Exception:
             pass
 
+    # --- document category column (safe if it already exists) ---
+    try:
+        cursor.execute('SELECT category FROM documents LIMIT 1')
+    except Exception:
+        try:
+            cursor.execute("ALTER TABLE documents ADD COLUMN category VARCHAR(20) DEFAULT 'onboarding'")
+        except Exception:
+            pass
+
     # --- seed the Cleaning Procedures Test once ---
     try:
         cursor.execute('SELECT id FROM training_modules WHERE title = %s', ('Cleaning Procedures Test',))
