@@ -80,6 +80,14 @@
       </div>
 
       <div class="form-group">
+        <label>Category</label>
+        <select name="category">
+          <option value="onboarding" {{ 'selected' if not doc or doc.category != 'training' }}>Onboarding (shows in My Documents, must be completed first)</option>
+          <option value="training" {{ 'selected' if doc and doc.category == 'training' }}>Training (shows in My Training, unlocks after onboarding)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
         <label>Upload PDF from your computer</label>
         <input type="file" name="document_file" accept=".pdf,.doc,.docx">
         {% if doc and doc.file_url %}

@@ -4850,9 +4850,10 @@ def admin_add_document():
             file_url = upload_result.get('secure_url', '')
         conn = get_db()
         cur = conn.cursor()
+        category = request.form.get('category', 'onboarding')
         cur.execute(
-            "INSERT INTO documents (title, doc_type, drive_link, file_url, description, active) VALUES (%s, %s, %s, %s, %s, %s)",
-            (title, doc_type, drive_link, file_url, description, 1)
+            "INSERT INTO documents (title, doc_type, drive_link, file_url, description, active, category) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+            (title, doc_type, drive_link, file_url, description, 1, category)
         )
         conn.commit()
         return redirect('/admin/documents')
@@ -4896,9 +4897,10 @@ def admin_edit_document(doc_id):
                 type='upload'
             )
             file_url = upload_result.get('secure_url', '')
+        category = request.form.get('category', 'onboarding')
         cur.execute(
-            "UPDATE documents SET title=%s, doc_type=%s, drive_link=%s, file_url=%s, description=%s, active=%s WHERE id=%s",
-            (title, doc_type, drive_link, file_url, description, active, doc_id)
+            "UPDATE documents SET title=%s, doc_type=%s, drive_link=%s, file_url=%s, description=%s, active=%s, category=%s WHERE id=%s",
+            (title, doc_type, drive_link, file_url, description, active, category, doc_id)
         )
         conn.commit()
         return redirect('/admin/documents')
