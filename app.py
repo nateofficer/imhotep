@@ -1112,33 +1112,9 @@ def dashboard():
 
                 <div class="ad-row"><a class="btn" href="https://biz.yelp.com/" target="_blank" rel="noopener noreferrer" style="background:#D32323;">Yelp</a><button class="btn copy-src" data-src="yelp" style="background:#e9e4de;color:#3a332c;">Copy link</button><span class="ad-tip">Claim the free listing; skip the paid ads</span></div>
 
-                <div class="ad-row"><a class="btn" href="https://ads.tiktok.com/" target="_blank" rel="noopener noreferrer" style="background:#010101;">TikTok</a><button class="btn copy-src" data-src="tiktok" style="background:#e9e4de;color:#3a332c;">Copy link</button><span class="ad-tip">Better for hiring than for customers</span></div><div class="ad-row"><a class="btn" href="https://ads.google.com/" target="_blank" rel="noopener noreferrer" style="background:#4285F4;">Google Ads</a><button class="btn copy-src" data-src="google_ads" style="background:#e9e4de;color:#3a332c;">Copy link</button><span class="ad-tip">Highest intent &mdash; people searching for a cleaner right now</span></div>
+                <div class="ad-row"><a class="btn" href="https://ads.tiktok.com/" target="_blank" rel="noopener noreferrer" style="background:#010101;">TikTok</a><button class="btn copy-src" data-src="tiktok" style="background:#e9e4de;color:#3a332c;">Copy link</button><span class="ad-tip">Better for hiring than for customers</span></div>
 
-                <div class="ad-row"><a class="btn" href="https://www.facebook.com/adsmanager/manage/campaigns" target="_blank" rel="noopener noreferrer" style="background:#1877F2;">Facebook</a><button class="btn copy-src" data-src="facebook" style="background:#e9e4de;color:#3a332c;">Copy link</button><span class="ad-tip">Proven for you &mdash; keep it</span></div>
-
-                <div class="ad-row"><a class="btn" href="https://lasvegas.craigslist.org/" target="_blank" rel="noopener noreferrer" style="background:#5C3D2E;">Craigslist</a><button class="btn copy-src" data-src="craigslist" style="background:#e9e4de;color:#3a332c;">Copy link</button><span class="ad-tip">Proven for you &mdash; keep it</span></div>
-
-                <div class="ad-row"><a class="btn" href="https://business.nextdoor.com/" target="_blank" rel="noopener noreferrer" style="background:#8ED500;color:#123;">Nextdoor</a><button class="btn copy-src" data-src="nextdoor" style="background:#e9e4de;color:#3a332c;">Copy link</button><span class="ad-tip">Free &mdash; best channel for residential cleaning</span></div>
-
-                <div class="ad-row"><a class="btn" href="https://www.thumbtack.com/pro/" target="_blank" rel="noopener noreferrer" style="background:#009FD9;">Thumbtack</a><button class="btn copy-src" data-src="thumbtack" style="background:#e9e4de;color:#3a332c;">Copy link</button><span class="ad-tip">Pay per lead &mdash; worth a test</span></div>
-
-                <div class="ad-row"><a class="btn" href="https://www.instagram.com/" target="_blank" rel="noopener noreferrer" style="background:#C13584;">Instagram</a><button class="btn copy-src" data-src="instagram" style="background:#e9e4de;color:#3a332c;">Copy link</button><span class="ad-tip">Post before/after photos</span></div>
-
-                <div class="ad-row"><a class="btn" href="https://biz.yelp.com/" target="_blank" rel="noopener noreferrer" style="background:#D32323;">Yelp</a><button class="btn copy-src" data-src="yelp" style="background:#e9e4de;color:#3a332c;">Copy link</button><span class="ad-tip">Claim the free listing; skip the paid ads</span></div>
-
-                <div class="ad-row"><a class="btn" href="https://forbusiness.snapchat.com/" target="_blank" rel="noopener noreferrer" style="background:#FFFC00;">Snapchat</a><button class="btn copy-src" data-src="snapchat" style="background:#e9e4de;color:#3a332c;">Copy link</button><span class="ad-tip">Better for hiring than for customers</span></div><div class="ad-row"><a class="btn" href="https://ads.google.com/" target="_blank" rel="noopener noreferrer" style="background:#4285F4;">Google Ads</a><button class="btn copy-src" data-src="google_ads" style="background:#e9e4de;color:#3a332c;">Copy link</button><span class="ad-tip">Highest intent &mdash; people searching for a cleaner right now</span></div>
-
-                <div class="ad-row"><a class="btn" href="https://www.facebook.com/adsmanager/manage/campaigns" target="_blank" rel="noopener noreferrer" style="background:#1877F2;">Facebook</a><button class="btn copy-src" data-src="facebook" style="background:#e9e4de;color:#3a332c;">Copy link</button><span class="ad-tip">Proven for you &mdash; keep it</span></div>
-
-                <div class="ad-row"><a class="btn" href="https://lasvegas.craigslist.org/" target="_blank" rel="noopener noreferrer" style="background:#5C3D2E;">Craigslist</a><button class="btn copy-src" data-src="craigslist" style="background:#e9e4de;color:#3a332c;">Copy link</button><span class="ad-tip">Proven for you &mdash; keep it</span></div>
-
-                <div class="ad-row"><a class="btn" href="https://business.nextdoor.com/" target="_blank" rel="noopener noreferrer" style="background:#8ED500;color:#123;">Nextdoor</a><button class="btn copy-src" data-src="nextdoor" style="background:#e9e4de;color:#3a332c;">Copy link</button><span class="ad-tip">Free &mdash; best channel for residential cleaning</span></div>
-
-                <div class="ad-row"><a class="btn" href="https://www.thumbtack.com/pro/" target="_blank" rel="noopener noreferrer" style="background:#009FD9;">Thumbtack</a><button class="btn copy-src" data-src="thumbtack" style="background:#e9e4de;color:#3a332c;">Copy link</button><span class="ad-tip">Pay per lead &mdash; worth a test</span></div>
-
-                <div class="ad-row"><a class="btn" href="https://www.instagram.com/" target="_blank" rel="noopener noreferrer" style="background:#C13584;">Instagram</a><button class="btn copy-src" data-src="instagram" style="background:#e9e4de;color:#3a332c;">Copy link</button><span class="ad-tip">Post before/after photos</span></div>
-
-                <div class="ad-row"><a class="btn" href="https://biz.yelp.com/" target="_blank" rel="noopener noreferrer" style="background:#D32323;">Yelp</a><button class="btn copy-src" data-src="yelp" style="background:#e9e4de;color:#3a332c;">Copy link</button><span class="ad-tip">Claim the free listing; skip the paid ads</span></div>
+                <div class="ad-row"><a class="btn" href="https://forbusiness.snapchat.com/" target="_blank" rel="noopener noreferrer" style="background:#FFFC00;">Snapchat</a><button class="btn copy-src" data-src="snapchat" style="background:#e9e4de;color:#3a332c;">Copy link</button><span class="ad-tip">Better for hiring than for customers</span></div>
 
                 <div class="ad-row"><a class="btn" href="https://ads.x.com/" target="_blank" rel="noopener noreferrer" style="background:#000000;">X</a><button class="btn copy-src" data-src="x" style="background:#e9e4de;color:#3a332c;">Copy link</button><span class="ad-tip">Better for hiring than for customers</span></div>
 
