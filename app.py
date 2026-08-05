@@ -617,6 +617,7 @@ def home():
         <a href="/jobs">Careers</a>
         <a href="/login">Admin</a>
         <a href="/trainee-login">Staff</a>
+        <a href="/dozens">The Dozens</a>
     </div>
     '''
 
@@ -2846,6 +2847,11 @@ def sign_onboarding_form(form_id):
 @trainee_required
 def view_onboarding_file_trainee(filename):
     return send_from_directory(UPLOAD_FOLDER, filename)
+
+
+@app.route('/dozens')
+def dozens_page():
+    return render_template('dozens.html')
 
 
 # ============ CRM MODULE ============

@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Dozens</title>
+<style>
+  :root{
+    --ink:#17121c;
+    --ink-2:#221a2b;
+    --yellow:#ffe23d;
+    --pink:#ff3d8a;
+    --cyan:#37e1c4;
+    --paper:#f7f3e9;
+    --stage:#0e0a12;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:
+      radial-gradient(1200px 600px at 50% -10%, #2a1d38 0%, transparent 60%),
+      var(--ink);
+    color:var(--paper);
+    min-height:100%;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:24px 18px 40px;
+    overflow-x:hidden;
+  }
+
+  /* ---- header ---- */
+  header{text-align:center;margin-top:6px}
+  .brand{
+    font-family:Impact,Haettenschweiler,"Arial Narrow Bold",sans-serif;
+    font-size:clamp(52px,16vw,120px);
+    line-height:.86;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--yellow);
+    text-shadow:
+      4px 4px 0 var(--pink),
+      8px 8px 0 rgba(0,0,0,.35);
+    transform:rotate(-2.5deg);
+  }
+  .brand .the{
+    display:block;
+    font-size:.34em;
+    color:var(--cyan);
+    text-shadow:3px 3px 0 rgba(0,0,0,.4);
+    letter-spacing:6px;
+    margin-bottom:-.08em;
+    transform:rotate(1.5deg);
+  }
+  .tag{
+    margin-top:16px;
+    font-size:clamp(13px,3.4vw,17px);
+    letter-spacing:2px;
+    text-transform:uppercase;
+    color:var(--paper);
+    opacity:.8;
+  }
+
+  /* ---- stage ---- */
+  .stage{
+    width:min(620px,94vw);
+    margin:26px auto 0;
+    background:var(--stage);
+    border:3px solid var(--yellow);
+    border-radius:20px;
+    padding:30px 26px;
+    min-height:230px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    box-shadow:0 18px 0 -6px rgba(0,0,0,.4), 0 0 0 6px var(--ink-2);
+    position:relative;
+  }
+  .badge{
+    position:absolute;top:-16px;left:50%;transform:translateX(-50%);
+    background:var(--pink);color:#fff;
+    font-family:Impact,sans-serif;letter-spacing:1px;
+    font-size:14px;padding:6px 16px;border-radius:999px;
+    text-transform:uppercase;white-space:nowrap;
+    box-shadow:0 4px 0 rgba(0,0,0,.35);
+  }
+  .art{width:170px;height:170px;margin-bottom:8px}
+  .art svg{width:100%;height:100%;display:block}
+  .snap{
+    font-family:Impact,Haettenschweiler,"Arial Narrow Bold",sans-serif;
+    font-size:clamp(26px,6.6vw,40px);
+    line-height:1.04;
+    text-transform:uppercase;
+    color:var(--paper);
+  }
+  .snap .hl{color:var(--cyan)}
+  .placeholder{color:#8a7f97;font-size:clamp(18px,4.6vw,24px);
+    font-family:Impact,sans-serif;text-transform:uppercase;letter-spacing:1px}
+
+  /* ---- controls ---- */
+  .mic{
+    margin-top:30px;
+    font-family:Impact,Haettenschweiler,sans-serif;
+    font-size:clamp(22px,6vw,30px);
+    letter-spacing:1.5px;
+    text-transform:uppercase;
+    color:var(--ink);
+    background:var(--yellow);
+    border:none;
+    padding:20px 34px;
+    border-radius:16px;
+    cursor:pointer;
+    box-shadow:0 8px 0 #c9a800;
+    transition:transform .06s ease, box-shadow .06s ease;
+  }
+  .mic:hover{background:#fff04d}
+  .mic:active{transform:translateY(6px);box-shadow:0 2px 0 #c9a800}
+  .mic:focus-visible{outline:4px solid var(--cyan);outline-offset:4px}
+
+  .count{
+    margin-top:18px;font-size:14px;letter-spacing:3px;
+    text-transform:uppercase;color:var(--paper);opacity:.55;
+  }
+
+  footer{
+    margin-top:34px;font-size:12px;letter-spacing:1.5px;
+    text-transform:uppercase;color:var(--paper);opacity:.4;text-align:center;
+  }
+
+  /* ---- reveal animation ---- */
+  @keyframes pop{
+    0%{transform:scale(.9) rotate(-1deg);opacity:0}
+    60%{transform:scale(1.04) rotate(.6deg)}
+    100%{transform:scale(1) rotate(0);opacity:1}
+  }
+  .reveal{animation:pop .32s cubic-bezier(.2,1.3,.4,1)}
+  @media (prefers-reduced-motion:reduce){
+    .reveal{animation:none}
+    .mic{transition:none}
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1 class="brand"><span class="the">Playing</span>The Dozens</h1>
+    <p class="tag">Tap the mic &middot; drop a snap</p>
+  </header>
+
+  <main class="stage" id="stage" aria-live="polite">
+    <div class="placeholder" id="content">Hit the mic to start the cypher &rarr;</div>
+  </main>
+
+  <button class="mic" id="mic" aria-label="Drop a snap">🎤 Drop a Snap</button>
+  <p class="count" id="count">Snap #0</p>
+
+  <footer>All jokes &middot; no malice &middot; keep it funny</footer>
+
+<script>
+/* ---------- TEXT SNAPS (absurd, crowd-friendly) ---------- */
+const textSnaps = [
+  // --- mama ---
+  "Yo mama so old, her Social Security number is <b>1</b>.",
+  "Yo mama so extra, she <b>waves at security cameras</b> just in case.",
+  "Yo mama so dramatic, she needs a <b>soundtrack</b> to open the fridge.",
+  // --- sister ---
+  "Yo sister so competitive, she demands a <b>rematch</b> from the Magic 8-Ball.",
+  "Yo sister so extra, she <b>claps for her own jokes</b> before the punchline.",
+  "Yo sister so lucky, she found a parking spot in a <b>dream</b> and it was still there when she woke up.",
+  // --- brother ---
+  "Yo brother so slow, he came <b>last</b> in a race he ran by himself.",
+  "Yo brother so confused, he brought a <b>spoon</b> to a knife fight and won by accident.",
+  "Yo brother so bold, he cut the line at a line <b>he started</b>.",
+  // --- cousin ---
+  "Yo cousin so sneaky, his own <b>shadow</b> filed a missing person report.",
+  "Yo cousin so late, he showed up to his own <b>surprise party</b> a week after.",
+  // --- grandma ---
+  "Yo grandma so classic, the museum keeps trying to <b>frame her</b>.",
+  "Yo grandma so sharp, she <b>corrects the GPS</b>.",
+  "Yo grandma so bold, she wants a <b>rematch</b> from the DMV.",
+  // --- grandpa ---
+  "Yo grandpa so old, his first birthday candle was a <b>real fire</b>.",
+  "Yo grandpa so stubborn, GPS just says <b>'do whatever you want.'</b>",
+  // --- uncle ---
+  "Yo uncle so cheap, he <b>reuses</b> his birthday candles.",
+  "Yo uncle so broke, he put a <b>single fry</b> on layaway.",
+  // --- aunt ---
+  "Yo aunt so extra, she needs an <b>entrance theme</b> to leave a voicemail.",
+  "Yo aunt so dramatic, she <b>sighs in cursive</b>.",
+  // --- kids ---
+  "Yo kids so clumsy, they tripped over the <b>WiFi signal</b>.",
+  "Yo kids so loud, the fire alarm calls <b>THEM</b> for backup.",
+  // --- you ---
+  "You so late, your own <b>alarm clock</b> gave up on you.",
+  "You so bold, you brought <b>receipts</b> to a staring contest.",
+  "You so extra, you <b>bow</b> after leaving a group chat."
+];
+
+/* ---------- PICTURE SNAPS (surprise cartoon payoff) ---------- */
+const picSnaps = [
+  { art:"planet", text:"Yo mama so big, she's got her own little <b>moon</b> following her." },
+  { art:"snail",  text:"Yo mama so slow, this <b>snail</b> is still waiting on her." },
+  { art:"mummy",  text:"Yo mama so old, <b>dinosaurs</b> asked HER for advice." },
+  { art:"wallet", text:"Yo mama so broke, even the <b>moths</b> moved out." },
+  { art:"mega",   text:"Yo mama so loud, this <b>whole page</b> can hear her." },
+  { art:"banana", text:"Yo mama so clumsy, she found the <b>ONE banana peel</b> in the city." }
+];
+
+/* ---------- CARTOONS (inline SVG, fully offline) ---------- */
+const YEL="#ffe23d", PNK="#ff3d8a", CYN="#37e1c4", DK="#0e0a12", WHT="#f7f3e9";
+const art = {
+  planet:`<svg viewBox="0 0 200 200"><circle cx="95" cy="105" r="66" fill="${YEL}" stroke="${DK}" stroke-width="6"/><ellipse cx="95" cy="118" rx="82" ry="20" fill="none" stroke="${PNK}" stroke-width="7"/><circle cx="80" cy="95" r="7" fill="${DK}"/><circle cx="112" cy="95" r="7" fill="${DK}"/><path d="M78 128 q17 16 34 0" fill="none" stroke="${DK}" stroke-width="6" stroke-linecap="round"/><circle cx="163" cy="60" r="13" fill="${CYN}" stroke="${DK}" stroke-width="5"/></svg>`,
+  snail:`<svg viewBox="0 0 200 200"><path d="M40 150 q0 -14 20 -14 h70" fill="none" stroke="${DK}" stroke-width="7" stroke-linecap="round"/><circle cx="90" cy="112" r="42" fill="${CYN}" stroke="${DK}" stroke-width="6"/><circle cx="90" cy="112" r="24" fill="none" stroke="${DK}" stroke-width="5"/><circle cx="90" cy="112" r="9" fill="none" stroke="${DK}" stroke-width="4"/><path d="M132 138 q22 -4 24 -30" fill="none" stroke="${DK}" stroke-width="7" stroke-linecap="round"/><circle cx="156" cy="104" r="9" fill="${YEL}" stroke="${DK}" stroke-width="5"/><circle cx="156" cy="103" r="3" fill="${DK}"/><line x1="150" y1="97" x2="146" y2="86" stroke="${DK}" stroke-width="5" stroke-linecap="round"/><text x="60" y="70" font-size="26" fill="${PNK}" font-family="Impact,sans-serif">z z</text></svg>`,
+  mummy:`<svg viewBox="0 0 200 200"><rect x="66" y="40" width="68" height="120" rx="26" fill="${WHT}" stroke="${DK}" stroke-width="6"/><line x1="66" y1="70" x2="134" y2="66" stroke="${DK}" stroke-width="5"/><line x1="66" y1="92" x2="134" y2="96" stroke="${DK}" stroke-width="5"/><line x1="66" y1="116" x2="134" y2="112" stroke="${DK}" stroke-width="5"/><line x1="66" y1="140" x2="134" y2="144" stroke="${DK}" stroke-width="5"/><circle cx="86" cy="82" r="6" fill="${DK}"/><circle cx="114" cy="82" r="6" fill="${DK}"/><path d="M40 40 l20 16 M40 40 l4 24 M40 40 l24 4" stroke="${CYN}" stroke-width="4" stroke-linecap="round"/><circle cx="40" cy="40" r="5" fill="${CYN}"/></svg>`,
+  wallet:`<svg viewBox="0 0 200 200"><rect x="42" y="78" width="116" height="74" rx="12" fill="${PNK}" stroke="${DK}" stroke-width="6"/><path d="M42 96 h116" stroke="${DK}" stroke-width="5"/><circle cx="138" cy="115" r="9" fill="${YEL}" stroke="${DK}" stroke-width="5"/><g stroke="${DK}" stroke-width="4" fill="${WHT}"><ellipse cx="98" cy="50" rx="10" ry="16"/><ellipse cx="82" cy="52" rx="12" ry="8"/><ellipse cx="114" cy="52" rx="12" ry="8"/></g><line x1="98" y1="66" x2="98" y2="78" stroke="${DK}" stroke-width="4" stroke-dasharray="4 5"/></svg>`,
+  mega:`<svg viewBox="0 0 200 200"><path d="M40 88 l40 -8 v40 l-40 -8 z" fill="${YEL}" stroke="${DK}" stroke-width="6" stroke-linejoin="round"/><path d="M80 78 l46 -22 v88 l-46 -22 z" fill="${PNK}" stroke="${DK}" stroke-width="6" stroke-linejoin="round"/><path d="M140 74 q16 26 0 52" fill="none" stroke="${CYN}" stroke-width="6" stroke-linecap="round"/><path d="M154 62 q28 38 0 76" fill="none" stroke="${CYN}" stroke-width="6" stroke-linecap="round"/></svg>`,
+  banana:`<svg viewBox="0 0 200 200"><circle cx="96" cy="52" r="16" fill="${YEL}" stroke="${DK}" stroke-width="5"/><path d="M96 68 l14 34 M96 68 l-16 30" stroke="${DK}" stroke-width="6" stroke-linecap="round"/><path d="M104 84 l26 -6 M92 82 l-24 10" stroke="${DK}" stroke-width="6" stroke-linecap="round"/><path d="M64 150 q16 -22 40 -18 q22 4 30 20 z" fill="${YEL}" stroke="${DK}" stroke-width="5" stroke-linejoin="round"/><path d="M84 138 q14 -8 34 4" fill="none" stroke="${DK}" stroke-width="4"/><path d="M110 108 l10 10 M120 108 l-10 10" stroke="${PNK}" stroke-width="5" stroke-linecap="round"/></svg>`
+};
+
+/* ---------- ENGINE ---------- */
+const stage=document.getElementById('stage');
+const content=document.getElementById('content');
+const mic=document.getElementById('mic');
+const countEl=document.getElementById('count');
+let count=0, lastText=-1, lastPic=-1;
+
+function pick(arr,last){
+  let i; do{ i=Math.floor(Math.random()*arr.length); } while(arr.length>1 && i===last);
+  return i;
+}
+
+function drop(){
+  count++;
+  countEl.textContent="Snap #"+count;
+  const showPic = count % 4 === 0;      // surprise picture every 4th snap
+  stage.classList.remove('reveal'); void stage.offsetWidth; // restart anim
+
+  const old=stage.querySelector('.badge'); if(old) old.remove();
+  const badge=document.createElement('div'); badge.className='badge';
+
+  if(showPic){
+    lastPic=pick(picSnaps,lastPic);
+    const p=picSnaps[lastPic];
+    badge.textContent="📸 that's a picture, baby";
+    content.innerHTML=`<div class="art">${art[p.art]}</div><div class="snap">${p.text.replace(/<b>/g,'<span class="hl">').replace(/<\/b>/g,'</span>')}</div>`;
+  } else {
+    lastText=pick(textSnaps,lastText);
+    badge.textContent="🔥 straight up";
+    content.className="";
+    content.innerHTML=`<div class="snap">${textSnaps[lastText].replace(/<b>/g,'<span class="hl">').replace(/<\/b>/g,'</span>')}</div>`;
+  }
+  stage.appendChild(badge);
+  stage.classList.add('reveal');
+}
+
+mic.addEventListener('click',drop);
+document.addEventListener('keydown',e=>{
+  if(e.code==='Space' && document.activeElement!==mic){ e.preventDefault(); drop(); }
+});
+</script>
+</body>
+</html>
