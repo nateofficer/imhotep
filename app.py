@@ -6029,6 +6029,135 @@ def _iv_cal_sync(candidate_id, name, date_str):
 
 
 
+
+# === RESET_ANALYTICS_V1 (temporary admin decode+reset tool -- remove after use) ===
+from flask import session as _ra_session, request as _ra_request, Response as _ra_Response
+
+def _ra_val(row, key, idx):
+    # App uses pymysql DictCursor (rows are dicts keyed by column name); stay
+    # defensive so this also works if a plain-tuple cursor is ever used.
+    if isinstance(row, dict):
+        return row.get(key)
+    try:
+        return row[idx]
+    except Exception:
+        return None
+
+def _reset_analytics_view():
+    # 404 (not 403) for non-admins so the route's existence never leaks.
+    if not _ra_session.get('logged_in'):
+        return _ra_Response('Not found', status=404)
+
+    db = get_db()
+    cur = db.cursor()
+
+    if _ra_request.method == 'POST' and _ra_request.form.get('confirm') == 'WIPE':
+        results = []
+        for _tbl in ('quote_events', 'leads'):
+            try:
+                cur.execute('DELETE FROM ' + _tbl)
+                results.append((_tbl, cur.rowcount))
+            except Exception as _e:
+                results.append((_tbl, 'ERROR: ' + str(_e)))
+        db.commit()
+        _rows = ''.join('<li><b>%s</b>: %s rows deleted</li>' % (t, n) for t, n in results)
+        return ('<h2>Reset complete</h2><ul>%s</ul>'
+                '<p><a href="/dashboard">Back to dashboard</a></p>') % _rows
+
+    # ---- GET: read-only decode report ----
+    cols = []
+    schema_html = ''
+    try:
+        cur.execute('DESCRIBE quote_events')
+        for r in cur.fetchall():
+            f = _ra_val(r, 'Field', 0); t = _ra_val(r, 'Type', 1)
+            cols.append(f)
+            schema_html += '<li>%s <span style="color:#888">%s</span></li>' % (f, t)
+    except Exception as _e:
+        schema_html = '<li>ERROR reading schema: %s</li>' % _e
+
+    breakdown_html = ''
+    try:
+        cur.execute("SELECT source AS s, COUNT(*) AS n FROM quote_events "
+                    "GROUP BY source ORDER BY n DESC")
+        for r in cur.fetchall():
+            breakdown_html += '<tr><td>%s</td><td>%s</td></tr>' % (
+                _ra_val(r, 's', 0), _ra_val(r, 'n', 1))
+    except Exception as _e:
+        breakdown_html = '<tr><td colspan="2">ERROR: %s</td></tr>' % _e
+
+    ref_col = None
+    for _cand in ('referer', 'referrer', 'http_referer', 'ref',
+                  'referrer_url', 'landing', 'landing_page', 'path', 'url', 'page'):
+        if _cand in cols:
+            ref_col = _cand
+            break
+
+    decode_html = ''
+    if ref_col:
+        try:
+            cur.execute("SELECT `%s` AS v, COUNT(*) AS n FROM quote_events "
+                        "WHERE source='direct' GROUP BY `%s` ORDER BY n DESC" % (ref_col, ref_col))
+            drows = cur.fetchall()
+            if drows:
+                decode_html = ('<p>Splitting <b>direct</b> by <b>%s</b>:</p>'
+                               '<table border="1" cellpadding="4"><tr><th>%s</th><th>count</th></tr>'
+                               % (ref_col, ref_col))
+                for r in drows:
+                    v = _ra_val(r, 'v', 0)
+                    v = v if (v not in (None, '')) else '(empty)'
+                    decode_html += '<tr><td>%s</td><td>%s</td></tr>' % (v, _ra_val(r, 'n', 1))
+                decode_html += '</table>'
+            else:
+                decode_html = '<p>No direct rows to decode.</p>'
+        except Exception as _e:
+            decode_html = '<p>ERROR decoding: %s</p>' % _e
+    else:
+        try:
+            cur.execute("SELECT * FROM quote_events WHERE source='direct' LIMIT 25")
+            sample = cur.fetchall()
+            if sample and isinstance(sample[0], dict):
+                heads = list(sample[0].keys())
+                decode_html = ('<p><b>No referrer/landing column exists</b>, so the '
+                               '&quot;direct&quot; rows cannot be split retroactively -- they '
+                               'only recorded the source word. Raw sample (up to 25) of what '
+                               'WAS stored per direct row:</p>'
+                               '<table border="1" cellpadding="4"><tr>'
+                               + ''.join('<th>%s</th>' % h for h in heads) + '</tr>')
+                for r in sample:
+                    decode_html += '<tr>' + ''.join('<td>%s</td>' % r.get(h) for h in heads) + '</tr>'
+                decode_html += '</table>'
+            elif sample:
+                decode_html = '<p>Direct rows exist but cursor is not dict-based; columns: %s</p>' % ', '.join(cols)
+            else:
+                decode_html = '<p>No direct rows found.</p>'
+        except Exception as _e:
+            decode_html = '<p>ERROR sampling: %s</p>' % _e
+
+    return ('<div style="font-family:system-ui,Arial,sans-serif;max-width:44em;margin:1em">'
+            '<h2>Quote-events: decode &amp; reset</h2>'
+            '<h3>quote_events columns</h3><ul>%s</ul>'
+            '<h3>Views by source</h3>'
+            '<table border="1" cellpadding="4"><tr><th>source</th><th>views</th></tr>%s</table>'
+            '<h3>Decoding &quot;direct&quot;</h3>%s'
+            '<hr style="margin:1.5em 0">'
+            '<h3 style="color:#b00000">Reset (destructive)</h3>'
+            '<p style="color:#b00000">Deletes <b>every</b> row from <b>quote_events</b> '
+            '(views + funnel) and <b>leads</b> (all CRM leads). Cannot be undone.</p>'
+            '<form method="post"><p>Type <b>WIPE</b> to confirm:</p>'
+            '<input name="confirm" autocomplete="off" style="font-size:16px;padding:6px"> '
+            '<button type="submit" style="font-size:16px;padding:6px 14px">Delete everything</button>'
+            '</form><p><a href="/dashboard">Cancel</a></p></div>') % (
+                schema_html, breakdown_html, decode_html)
+
+try:
+    app.add_url_rule('/admin/reset-analytics', 'reset_analytics_view',
+                     _reset_analytics_view, methods=['GET', 'POST'])
+except Exception:
+    pass
+# === END RESET_ANALYTICS_V1 ===
+
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
