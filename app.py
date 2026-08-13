@@ -3253,10 +3253,10 @@ def crm_delete(lead_id):
     return redirect('/crm')
 
 
-QUOTE_BASE = 70.0
-QUOTE_PER_BED = 25.0
-QUOTE_PER_BATH = 35.0
-QUOTE_PER_SQFT = 0.015
+QUOTE_BASE = 80.0
+QUOTE_PER_BED = 22.0
+QUOTE_PER_BATH = 30.0
+QUOTE_PER_SQFT = 0.012
 QUOTE_MIN = 150.0
 
 QUOTE_TYPE_MULT = {
@@ -3269,7 +3269,7 @@ QUOTE_FREQ_MULT = {
     'weekly': 0.88,
     'biweekly': 0.94,
     'monthly': 0.97,
-    'onetime': 1.25,
+    'onetime': 1.15,
 }
 QUOTE_TYPE_LABEL = {
     'standard': 'Standard Clean',
@@ -3598,7 +3598,7 @@ def render_quote_page(source):
 </div>
 <div class="hero">
   <h1>Get Your Free Instant Quote</h1>
-  <p>Tell us about your home &mdash; we&rsquo;ll email you a free quote.</p>
+  <p>See your price the moment you finish &mdash; no waiting on an email.</p>
 </div>
 <div class="wrap">
 
@@ -3638,24 +3638,24 @@ def render_quote_page(source):
       <div class="val" id="sqftv">2000</div></div>
   </div>
 
-  <div class="card hidden" id="rangecard">
+  <div class="card" id="rangecard">
     <p class="sub" style="text-align:center;margin:0 0 6px;">Your estimated price</p>
     <div class="range" id="range">$210 &ndash; $250</div>
     <p class="note" id="rangenote">Estimate updates as you adjust your home above.</p>
   </div>
 
   <div class="card" id="gate">
-    <h2>You&rsquo;re all set &mdash; nice work!</h2>
-    <p class="sub">Just pop in your email and your free quote is on its way. No cost, no obligation.</p>
+    <h2>Like your estimate? Lock it in.</h2>
+    <p class="sub">Enter your info and we&rsquo;ll lock in this estimate and reach out to schedule your clean. No cost, no obligation.</p>
     <div class="two">
       <div class="fld"><label>First name *</label><input id="fn" required></div>
       <div class="fld"><label>Email *</label><input id="em" type="email" required></div>
     </div>
     <!-- kept in the DOM so the JS still works; submitted empty -->
     <div class="fld hidden"><label>Last name</label><input id="ln"></div>
-    <div class="fld hidden"><label>Phone</label><input id="ph" type="tel"></div>
+    <div class="fld"><label>Phone (optional)</label><input id="ph" type="tel"></div>
     <div class="fld"><label>Address (optional)</label><input id="ad"></div>
-    <button class="btn" id="go">Email Me My Free Quote</button>
+    <button class="btn" id="go">Lock In My Price</button>
     <div class="err" id="err"></div>
     <p class="note">No obligation. We'll never share your information.</p>
   </div>
@@ -3698,13 +3698,13 @@ function toggleFreq(){
 toggleFreq();
 
 var TYPE_MULT = {standard:1.00, deep:1.43, moveout:1.60, airbnb:1.00};
-var FREQ_MULT = {weekly:0.88, biweekly:0.94, monthly:0.97, onetime:1.25};
+var FREQ_MULT = {weekly:0.88, biweekly:0.94, monthly:0.97, onetime:1.15};
 
 function estimate(){
   var bed  = +document.getElementById('bed').value;
   var bath = +document.getElementById('bath').value;
   var sqft = +document.getElementById('sqft').value;
-  var p = 70 + 25*bed + 35*bath + 0.015*sqft;
+  var p = 80 + 22*bed + 30*bath + 0.012*sqft;
   p = p * (TYPE_MULT[state.type] || 1);
   if(state.type === 'standard' || state.type === 'airbnb'){
     p = p * (FREQ_MULT[state.freq] || 1);
@@ -3737,7 +3737,7 @@ document.getElementById('go').addEventListener('click', function(){
   }
   err.style.display = 'none';
   var btn = this;
-  btn.disabled = true; btn.textContent = 'Sending your quote...';
+  btn.disabled = true; btn.textContent = 'Locking in your price...';
 
   var d = new FormData();
   d.append('first_name', fn);
@@ -3769,7 +3769,7 @@ document.getElementById('go').addEventListener('click', function(){
       res.scrollIntoView({behavior:'smooth'});
     })
     .catch(function(){
-      btn.disabled = false; btn.textContent = 'Email Me My Free Quote';
+      btn.disabled = false; btn.textContent = 'Lock In My Price';
       err.textContent = 'Something went wrong. Please call us at (702) 506-8918.';
       err.style.display = 'block';
     });
