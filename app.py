@@ -6053,7 +6053,7 @@ def _reset_analytics_view():
 
     if _ra_request.method == 'POST' and _ra_request.form.get('confirm') == 'WIPE':
         results = []
-        for _tbl in ('quote_events', 'leads'):
+        for _tbl in ('quote_events', 'leads', 'page_counters'):
             try:
                 cur.execute('DELETE FROM ' + _tbl)
                 results.append((_tbl, cur.rowcount))
