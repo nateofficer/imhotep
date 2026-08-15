@@ -5244,6 +5244,14 @@ def _rnd_init():
                     ("6968",))
     except Exception:
         pass
+    for _c in ("what_is", "what_should_be"):
+        try:
+            cur.execute("SELECT " + _c + " FROM rnd_problems LIMIT 1")
+        except Exception:
+            try:
+                cur.execute("ALTER TABLE rnd_problems ADD COLUMN " + _c + " TEXT")
+            except Exception:
+                pass
     conn.commit()
     cur.close()
     conn.close()
@@ -5371,15 +5379,21 @@ def _rnd_list():
     body.append('<form method="POST" action="/rnd/new" style="max-width:640px">')
     body.append('<p><input name="title" placeholder="Problem in one line" '
                 'style="width:100%;padding:8px" required></p>')
-    body.append('<p><textarea name="statement" rows="4" style="width:100%;padding:8px" '
-                'placeholder="State the problem in a paragraph"></textarea></p>')
+    body.append('<p style="color:#666;margin:6px 0 0">The problem is the gap: '
+                '<b>what is</b> vs <b>what should be</b>.</p>')
+    body.append('<p><textarea name="what_is" rows="2" style="width:100%;padding:8px" '
+                'placeholder="What is &mdash; the reality right now"></textarea></p>')
+    body.append('<p><textarea name="what_should_be" rows="2" style="width:100%;padding:8px" '
+                'placeholder="What should be &mdash; where it should be"></textarea></p>')
     body.append('<p>Domain: <select name="domain">' + opts + '</select></p>')
     body.append('<fieldset style="border:1px solid #ddd;padding:12px">'
-                '<legend><b>Triage gate</b> &mdash; all four checked = decision path</legend>')
-    body.append(_rnd_chk("reversible", "Reversible &mdash; can I undo it cheaply?"))
-    body.append(_rnd_chk("recurring", "Recurring &mdash; have I faced this exact problem before?"))
-    body.append(_rnd_chk("data_on_hand", "Known variables &mdash; do I already have the data?"))
-    body.append(_rnd_chk("cost_bounded", "Bounded cost &mdash; is the downside small?"))
+                '<legend><b>How big is this?</b></legend>')
+    body.append('<label style="display:block;margin:4px 0">'
+                '<input type="radio" name="size" value="small" checked> '
+                'Small &mdash; a quick decision (decision path)</label>')
+    body.append('<label style="display:block;margin:4px 0">'
+                '<input type="radio" name="size" value="big"> '
+                'Big &mdash; needs research (research path)</label>')
     body.append('</fieldset>')
     body.append('<p><input name="metric" placeholder="Metric to watch '
                 '(e.g. leads_per_week_facebook)" style="width:100%;padding:8px"></p>')
@@ -5388,7 +5402,7 @@ def _rnd_list():
     body.append('<p><input name="predicted" placeholder="What I expect to happen" '
                 'style="width:100%;padding:8px"></p>')
     body.append('<p><label>Review on: <input type="date" name="review_date"></label></p>')
-    body.append('<p><button type="submit" class="btn">Run triage</button></p></form>')
+    body.append('<p><button type="submit" class="btn">Log problem</button></p></form>')
     body.append('<h2 style="margin-top:36px">Passcode</h2>')
     if request.args.get("changed"):
         body.append('<p style="color:#127a2e"><b>Passcode changed.</b></p>')
@@ -5410,12 +5424,15 @@ def _rnd_new():
         return redirect("/rnd")
     _rnd_init()
     f = request.form
-    rev = 1 if f.get("reversible") else 0
-    rec = 1 if f.get("recurring") else 0
-    dat = 1 if f.get("data_on_hand") else 0
-    cost = 1 if f.get("cost_bounded") else 0
-    path = _rnd_triage(rev, rec, dat, cost)
-    steps = _RND_DECISION_STEPS if path == "decision" else _RND_RESEARCH_STEPS
+    rev = rec = dat = cost = 0
+    path = "decision" if (f.get("size") or "small") == "small" else "research"
+    steps = (["Identify the problem", "Find alternatives",
+              "Hypothesize the solution", "Implement"]
+             if path == "decision"
+             else ["Define the problem", "Literature review", "Data analysis",
+                   "Solve the problem", "Implementation"])
+    _what_is = (f.get("what_is") or "").strip()
+    _what_should = (f.get("what_should_be") or "").strip()
 
     try:
         baseline = float(f.get("baseline")) if f.get("baseline") else None
@@ -5424,14 +5441,18 @@ def _rnd_new():
 
     conn = _rnd_conn()
     cur = conn.cursor()
+    _stmt = f.get("statement", "")
+    if _what_is or _what_should:
+        _stmt = "Now: " + _what_is + "   \u2192   Should be: " + _what_should
     cur.execute("""INSERT INTO rnd_problems
         (title, statement, domain, reversible, recurring, data_on_hand, cost_bounded,
-         path, status, current_step, opened_at, predicted, metric, baseline, review_date)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'open',1,%s,%s,%s,%s,%s)""",
-        (f.get("title", "").strip(), f.get("statement", ""), f.get("domain", ""),
+         path, status, current_step, opened_at, predicted, metric, baseline, review_date,
+         what_is, what_should_be)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'open',1,%s,%s,%s,%s,%s,%s,%s)""",
+        (f.get("title", "").strip(), _stmt, f.get("domain", ""),
          rev, rec, dat, cost, path, _rnd_dt.now(),
          f.get("predicted", ""), f.get("metric", ""), baseline,
-         f.get("review_date") or None))
+         f.get("review_date") or None, _what_is, _what_should))
     pid = cur.lastrowid
     for i, name in enumerate(steps, start=1):
         cur.execute("INSERT INTO rnd_steps (problem_id, step_no, step_name) VALUES (%s,%s,%s)",
@@ -5444,62 +5465,52 @@ def _rnd_new():
 
 # --- RND_PROMPTS_V1: generic guiding questions per step --------------------
 _RND_PROMPTS = {
-    # research path
-    "Define the problem": [
-        "What exactly is the decision or question, in one sentence?",
-        "Who is affected, and what happens if you do nothing?",
-        "What would a good answer let you do that you cannot do now?",
+    # decision path (small)
+    "Identify the problem": [
+        "What is the gap -- what IS, minus what SHOULD BE?",
+        "Is this urgent, or does it just feel urgent?",
+        "What does it cost to leave it alone?",
     ],
-    "Literature review": [
-        "What do you already know, and how do you know it?",
-        "Who has faced this before -- competitors, past jobs, industry norms?",
-        "What sources or numbers can you pull instead of guessing?",
+    "Find alternatives": [
+        "List at least three options, including 'do nothing'.",
+        "What is the fast/cheap option and the thorough one?",
+        "What has worked on a similar problem before?",
     ],
-    "Design / hypothesis": [
-        "What is your best guess at the answer right now?",
-        "What would prove that guess wrong?",
-        "What will you measure, and what counts as success?",
-    ],
-    "Collect data": [
-        "What specific numbers or facts do you need to gather?",
-        "Where does each one come from, and how long will it take?",
-        "What is the smallest sample that would still be convincing?",
-    ],
-    "Analyze data": [
-        "What does the data actually say -- not what you hoped?",
-        "Does it support or kill your hypothesis?",
-        "What surprised you, and what still does not add up?",
-    ],
-    "Conclusions and recommendations": [
-        "In one sentence, what should be done?",
-        "What is the cost, the risk, and the expected payoff?",
-        "What would make you reverse this recommendation?",
+    "Hypothesize the solution": [
+        "Which option do you think closes the gap, and why?",
+        "What do you expect to happen if you do it?",
+        "What would tell you the guess was wrong?",
     ],
     "Implement": [
         "What are the first three concrete steps, and who does each?",
-        "What is the deadline, and what is the budget?",
+        "What is the deadline and the budget?",
         "How will you know it is actually done?",
     ],
-    "Evaluate the result": [
-        "What is the metric now, versus the baseline you wrote down?",
-        "Did it work, fail, or come out unclear -- and why?",
-        "What would you do differently next time?",
+    # research path (big)
+    "Define the problem": [
+        "State the gap in one sentence -- what is vs what should be.",
+        "Who is affected, and what happens if you do nothing?",
+        "What would a good answer let you do that you cannot now?",
     ],
-    # decision path (shares the last two names with research above)
-    "Identify the problem": [
-        "What is the problem in one sentence?",
-        "Is this urgent, or does it just feel urgent?",
-        "What is the real cost of leaving it alone?",
+    "Literature review": [
+        "What do you already know, and how do you know it?",
+        "Who has faced this before -- competitors, past jobs, norms?",
+        "What sources or numbers can you pull instead of guessing?",
     ],
-    "Generate alternatives": [
-        "List at least three options, including 'do nothing'.",
-        "What is the fast/cheap option and the thorough option?",
-        "What has worked for a similar problem before?",
+    "Data analysis": [
+        "What does the data actually say -- not what you hoped?",
+        "Does it support or kill your best guess?",
+        "What surprised you, and what still does not add up?",
     ],
-    "Evaluate and select": [
-        "What matters most here -- cost, speed, quality, risk?",
-        "Which option best fits that, and what does it trade away?",
-        "Why this one over the runner-up?",
+    "Solve the problem": [
+        "Given the data, what is the answer in one sentence?",
+        "What is the cost, the risk, and the expected payoff?",
+        "What would make you reverse this?",
+    ],
+    "Implementation": [
+        "What are the first three concrete steps, and who does each?",
+        "What is the deadline and the budget?",
+        "How will you know it worked -- what is the metric?",
     ],
 }
 
@@ -5523,7 +5534,8 @@ def _rnd_detail(pid):
     conn = _rnd_conn()
     cur = conn.cursor()
     cur.execute("""SELECT id,title,statement,domain,path,status,current_step,
-                          predicted,metric,baseline,review_date,actual,outcome,lesson
+                          predicted,metric,baseline,review_date,actual,outcome,lesson,
+                          what_is,what_should_be
                    FROM rnd_problems WHERE id=%s""", (pid,))
     p = cur.fetchone()
     if not p:
@@ -5542,7 +5554,13 @@ def _rnd_detail(pid):
          '<h1>' + _rnd_esc(p['title']) + '</h1>',
          '<p><b>' + kind + '</b> &nbsp;|&nbsp; ' + _rnd_esc(p['domain']) +
          ' &nbsp;|&nbsp; ' + _rnd_esc(p['status']) + '</p>']
-    if p['statement']:
+    if p.get('what_is') or p.get('what_should_be'):
+        b.append('<div style="background:#f6f6f6;padding:12px;margin:10px 0">'
+                 '<div><b>What is:</b> ' + _rnd_esc(p['what_is']) + '</div>'
+                 '<div><b>What should be:</b> ' + _rnd_esc(p['what_should_be']) + '</div>'
+                 '<div style="margin-top:6px;color:#2d6cdf"><b>The gap is the problem.</b></div>'
+                 '</div>')
+    elif p['statement']:
         b.append('<p style="background:#f6f6f6;padding:12px">' + _rnd_esc(p['statement']) + '</p>')
     if p['metric']:
         b.append('<p><b>Watching:</b> ' + _rnd_esc(p['metric']) + ' &nbsp; baseline ' +
