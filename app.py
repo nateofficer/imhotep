@@ -5568,6 +5568,7 @@ def _rnd_detail(pid):
     if p['predicted']:
         b.append('<p><b>Predicted:</b> ' + _rnd_esc(p['predicted']) + '</p>')
 
+    b.append('<p><a class="btn" href="/rnd/' + str(pid) + '/report" target="_blank">View / print report</a></p>')
     b.append('<h2>Steps</h2>')
     for s in steps:
         no, name, content, done = (s['step_no'], s['step_name'],
@@ -5686,6 +5687,84 @@ if callable(globals().get("admin_nav")):
             return out
 
 
+def _rnd_report(pid):
+    if not _rnd_is_admin():
+        return _RND_404
+    if not _rnd_unlocked():
+        return redirect("/rnd")
+    _rnd_init()
+    conn = _rnd_conn()
+    cur = conn.cursor()
+    cur.execute("""SELECT id,title,statement,domain,path,status,
+                          predicted,metric,baseline,review_date,actual,outcome,lesson,
+                          what_is,what_should_be,opened_at,closed_at
+                   FROM rnd_problems WHERE id=%s""", (pid,))
+    p = cur.fetchone()
+    if not p:
+        cur.close()
+        conn.close()
+        return _RND_404
+    cur.execute("""SELECT step_no, step_name, content, completed
+                   FROM rnd_steps WHERE problem_id=%s ORDER BY step_no""", (pid,))
+    steps = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    e = _rnd_esc
+    kind = ("Decision path (small problem)" if p['path'] == "decision"
+            else "Research path (large problem)")
+    r = ['<div style="max-width:760px;margin:0 auto;font-family:Georgia,serif;line-height:1.55">']
+    r.append('<p class="noprint"><a href="/rnd/' + str(pid) + '">&larr; Back</a>'
+             ' &nbsp;&nbsp; <a href="#" onclick="window.print();return false">Print / Save PDF</a></p>')
+    r.append('<h1 style="margin-bottom:2px">' + e(p['title']) + '</h1>')
+    r.append('<p style="color:#666;margin-top:0">' + kind + ' &nbsp;|&nbsp; ' +
+             e(p['domain']) + ' &nbsp;|&nbsp; ' + e(p['status']) + '</p>')
+    if p['opened_at'] or p['closed_at']:
+        r.append('<p style="color:#888;font-size:14px">Opened ' + e(p['opened_at']) +
+                 (' &nbsp; Closed ' + e(p['closed_at']) if p['closed_at'] else '') + '</p>')
+    r.append('<hr>')
+
+    r.append('<h3>The problem (the gap)</h3>')
+    if p['what_is'] or p['what_should_be']:
+        r.append('<p><b>What is:</b> ' + e(p['what_is']) + '<br>'
+                 '<b>What should be:</b> ' + e(p['what_should_be']) + '</p>')
+        r.append('<p style="color:#2d6cdf"><b>The gap is the problem.</b></p>')
+    elif p['statement']:
+        r.append('<p>' + e(p['statement']) + '</p>')
+
+    if p['metric'] or p['predicted']:
+        r.append('<h3>What we were watching</h3>')
+        if p['metric']:
+            r.append('<p><b>Metric:</b> ' + e(p['metric']) + ' &nbsp; baseline ' +
+                     e(p['baseline']) + ' &nbsp; review ' + e(p['review_date']) + '</p>')
+        if p['predicted']:
+            r.append('<p><b>Predicted:</b> ' + e(p['predicted']) + '</p>')
+
+    r.append('<h3>How it was worked</h3>')
+    for s in steps:
+        mark = '&#10004; ' if s['completed'] else ''
+        note = (e(s['content']).replace(chr(10), '<br>') if s['content']
+                else '<i style="color:#999">(no notes)</i>')
+        r.append('<p style="margin:12px 0"><b>' + str(s['step_no']) + '. ' + mark +
+                 e(s['step_name']) + '</b><br>' + note + '</p>')
+
+    r.append('<h3>Outcome</h3>')
+    if p['outcome']:
+        r.append('<p><b>Result:</b> ' + e(p['outcome']) +
+                 (' &nbsp; actual ' + e(p['actual']) if p['actual'] is not None else '') + '</p>')
+        if p['predicted'] and p['actual'] is not None:
+            r.append('<p><b>Predicted vs actual:</b> ' + e(p['predicted']) +
+                     ' &rarr; ' + e(p['actual']) + '</p>')
+        if p['lesson']:
+            r.append('<p><b>Lesson:</b> ' + e(p['lesson']) + '</p>')
+    else:
+        r.append('<p><i>Still open &mdash; no outcome recorded yet.</i></p>')
+
+    r.append('</div>')
+    r.append('<style>@media print{.noprint{display:none}}</style>')
+    return _rnd_style() + ''.join(r)
+
+
 for _rnd_rule, _rnd_ep, _rnd_fn, _rnd_m in [
     ("/rnd", "rnd_list", _rnd_list, ["GET"]),
     ("/rnd/unlock", "rnd_unlock", _rnd_unlock, ["POST"]),
@@ -5694,6 +5773,7 @@ for _rnd_rule, _rnd_ep, _rnd_fn, _rnd_m in [
     ("/rnd/<int:pid>", "rnd_detail", _rnd_detail, ["GET"]),
     ("/rnd/<int:pid>/step", "rnd_step", _rnd_step, ["POST"]),
     ("/rnd/<int:pid>/close", "rnd_close", _rnd_close, ["POST"]),
+    ("/rnd/<int:pid>/report", "rnd_report", _rnd_report, ["GET"]),
 ]:
     if not any(str(r.rule) == _rnd_rule for r in app.url_map.iter_rules()):
         app.add_url_rule(_rnd_rule, _rnd_ep, _rnd_fn, methods=_rnd_m)
