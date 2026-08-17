@@ -5395,13 +5395,13 @@ def _rnd_list():
                 '<input type="radio" name="size" value="big"> '
                 'Big &mdash; needs research (research path)</label>')
     body.append('</fieldset>')
-    body.append('<p><input name="metric" placeholder="Metric to watch '
-                '(e.g. leads_per_week_facebook)" style="width:100%;padding:8px"></p>')
-    body.append('<p><input name="baseline" placeholder="Baseline value today (number)" '
-                'style="width:100%;padding:8px"></p>')
-    body.append('<p><input name="predicted" placeholder="What I expect to happen" '
-                'style="width:100%;padding:8px"></p>')
-    body.append('<p><label>Review on: <input type="date" name="review_date"></label></p>')
+    body.append('<p><label>Number to watch (the one number that tells you it got better)<br>'
+                '<input name="metric" placeholder="e.g. new customers per month" style="width:100%;padding:8px"></label></p>')
+    body.append('<p><label>Where it is today (a number)<br>'
+                '<input name="baseline" placeholder="e.g. 0" style="width:100%;padding:8px"></label></p>')
+    body.append('<p><label>Where I think it will go<br>'
+                '<input name="predicted" placeholder="e.g. more than 0" style="width:100%;padding:8px"></label></p>')
+    body.append('<p><label>When I will check <input type="date" name="review_date"></label></p>')
     body.append('<p><button type="submit" class="btn">Log problem</button></p></form>')
     body.append('<h2 style="margin-top:36px">Passcode</h2>')
     if request.args.get("changed"):
@@ -5525,6 +5525,24 @@ def _rnd_prompt_html(step_name):
 # --- end RND_PROMPTS_V1 ----------------------------------------------------
 
 
+def _rnd_gap_html(wi, ws, title):
+    e = _rnd_esc
+
+    def _row(sign, label, val, tag):
+        return ('<div style="margin:2px 0">'
+                '<span style="display:inline-block;width:1.4em;font-weight:bold">' + sign + '</span>'
+                '<b>' + label + ':</b> ' + e(val) +
+                ' <span style="color:#999">(' + tag + ')</span></div>')
+
+    return ('<div style="font-family:Consolas,Menlo,monospace;background:#f6f6f6;'
+            'padding:14px;margin:10px 0;line-height:1.6">'
+            + _row('', 'What is', wi, 'minuend')
+            + _row('&minus;', 'What should be', ws, 'subtrahend')
+            + '<hr style="border:none;border-top:2px solid #333;margin:6px 0">'
+            + _row('=', 'The problem', title, 'difference')
+            + '</div>')
+
+
 def _rnd_detail(pid):
     if not _rnd_is_admin():
         return _RND_404
@@ -5555,18 +5573,14 @@ def _rnd_detail(pid):
          '<p><b>' + kind + '</b> &nbsp;|&nbsp; ' + _rnd_esc(p['domain']) +
          ' &nbsp;|&nbsp; ' + _rnd_esc(p['status']) + '</p>']
     if p.get('what_is') or p.get('what_should_be'):
-        b.append('<div style="background:#f6f6f6;padding:12px;margin:10px 0">'
-                 '<div><b>What is:</b> ' + _rnd_esc(p['what_is']) + '</div>'
-                 '<div><b>What should be:</b> ' + _rnd_esc(p['what_should_be']) + '</div>'
-                 '<div style="margin-top:6px;color:#2d6cdf"><b>The gap is the problem.</b></div>'
-                 '</div>')
+        b.append(_rnd_gap_html(p['what_is'], p['what_should_be'], p['title']))
     elif p['statement']:
         b.append('<p style="background:#f6f6f6;padding:12px">' + _rnd_esc(p['statement']) + '</p>')
     if p['metric']:
-        b.append('<p><b>Watching:</b> ' + _rnd_esc(p['metric']) + ' &nbsp; baseline ' +
-                 _rnd_esc(p['baseline']) + ' &nbsp; review ' + _rnd_esc(p['review_date']) + '</p>')
+        b.append('<p><b>Watching:</b> ' + _rnd_esc(p['metric']) + ' &nbsp; today: ' +
+                 _rnd_esc(p['baseline']) + ' &nbsp; check on ' + _rnd_esc(p['review_date']) + '</p>')
     if p['predicted']:
-        b.append('<p><b>Predicted:</b> ' + _rnd_esc(p['predicted']) + '</p>')
+        b.append('<p><b>Expected:</b> ' + _rnd_esc(p['predicted']) + '</p>')
 
     b.append('<p><a class="btn" href="/rnd/' + str(pid) + '/report" target="_blank">View / print report</a></p>')
     b.append('<h2>Steps</h2>')
@@ -5726,19 +5740,17 @@ def _rnd_report(pid):
 
     r.append('<h3>The problem (the gap)</h3>')
     if p['what_is'] or p['what_should_be']:
-        r.append('<p><b>What is:</b> ' + e(p['what_is']) + '<br>'
-                 '<b>What should be:</b> ' + e(p['what_should_be']) + '</p>')
-        r.append('<p style="color:#2d6cdf"><b>The gap is the problem.</b></p>')
+        r.append(_rnd_gap_html(p['what_is'], p['what_should_be'], p['title']))
     elif p['statement']:
         r.append('<p>' + e(p['statement']) + '</p>')
 
     if p['metric'] or p['predicted']:
         r.append('<h3>What we were watching</h3>')
         if p['metric']:
-            r.append('<p><b>Metric:</b> ' + e(p['metric']) + ' &nbsp; baseline ' +
-                     e(p['baseline']) + ' &nbsp; review ' + e(p['review_date']) + '</p>')
+            r.append('<p><b>Number watched:</b> ' + e(p['metric']) + ' &nbsp; today: ' +
+                     e(p['baseline']) + ' &nbsp; check on ' + e(p['review_date']) + '</p>')
         if p['predicted']:
-            r.append('<p><b>Predicted:</b> ' + e(p['predicted']) + '</p>')
+            r.append('<p><b>Expected:</b> ' + e(p['predicted']) + '</p>')
 
     r.append('<h3>How it was worked</h3>')
     for s in steps:
