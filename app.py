@@ -5333,11 +5333,12 @@ def _rnd_unlock():
     return redirect("/rnd?bad=1")
 
 
-def _rnd_list():
+def _rnd_list(pf=None):
     if not _rnd_is_admin():
         return _RND_404
     if not _rnd_unlocked():
         return _rnd_gate_page()
+    pf = pf or {}
     _rnd_init()
     conn = _rnd_conn()
     cur = conn.cursor()
@@ -5374,37 +5375,53 @@ def _rnd_list():
                         '<td>' + _rnd_esc(outcome or '-') + '</td></tr>')
         body.append('</table>')
 
-    opts = ''.join('<option value="' + d + '">' + d + '</option>' for d in _RND_DOMAINS)
+    _pf_dom = pf.get("domain", "")
+    opts = ''.join('<option value="' + d + '"' + (' selected' if d == _pf_dom else '') + '>' + d + '</option>' for d in _RND_DOMAINS)
     body.append('<h2 style="margin-top:32px">Log a new problem</h2>')
+    if pf.get("notice"):
+        body.append('<p style="background:#eef4ff;border:1px solid #cdddff;'
+                    'padding:10px;border-radius:6px;max-width:640px">'
+                    + _rnd_esc(pf.get("notice", "")) + '</p>')
     body.append('<form method="POST" action="/rnd/new" style="max-width:640px">')
     body.append('<p><input name="title" placeholder="Problem in one line" '
+                'value="' + _rnd_esc(pf.get("title", "")) + '" '
                 'style="width:100%;padding:8px" required></p>')
     body.append('<p style="color:#666;margin:6px 0 0">The problem is the gap: '
                 '<b>what is</b> vs <b>what should be</b>.</p>')
     body.append('<p><textarea name="what_is" rows="2" style="width:100%;padding:8px" '
-                'placeholder="What is &mdash; the reality right now"></textarea></p>')
+                'placeholder="What is &mdash; the reality right now">'
+                + _rnd_esc(pf.get("what_is", "")) + '</textarea></p>')
     body.append('<p><textarea name="what_should_be" rows="2" style="width:100%;padding:8px" '
-                'placeholder="What should be &mdash; where it should be"></textarea></p>')
+                'placeholder="What should be &mdash; where it should be">'
+                + _rnd_esc(pf.get("what_should_be", "")) + '</textarea></p>')
     body.append('<p style="color:#666;margin:14px 0 0"><b>Worked-out analysis</b> <span style="color:#999">(optional &mdash; the problem, the alternatives, and the recommended step)</span></p>')
-    body.append('<p><textarea name="analysis" rows="8" style="width:100%;padding:8px" placeholder="Type your analysis here, or leave it for the Work it out button to draft."></textarea></p>')
+    body.append('<p><textarea name="analysis" rows="8" style="width:100%;padding:8px" placeholder="Type your analysis here, or leave it for the Work it out button to draft.">' + _rnd_esc(pf.get("analysis", "")) + '</textarea></p>')
     body.append('<p>Domain: <select name="domain">' + opts + '</select></p>')
     body.append('<fieldset style="border:1px solid #ddd;padding:12px">'
                 '<legend><b>How big is this?</b></legend>')
+    _pf_size = pf.get("size", "small")
     body.append('<label style="display:block;margin:4px 0">'
-                '<input type="radio" name="size" value="small" checked> '
+                '<input type="radio" name="size" value="small"'
+                + (' checked' if _pf_size != "big" else '') + '> '
                 'Small &mdash; a quick decision (decision path)</label>')
     body.append('<label style="display:block;margin:4px 0">'
-                '<input type="radio" name="size" value="big"> '
+                '<input type="radio" name="size" value="big"'
+                + (' checked' if _pf_size == "big" else '') + '> '
                 'Big &mdash; needs research (research path)</label>')
     body.append('</fieldset>')
     body.append('<p><label>Number to watch (the one number that tells you it got better)<br>'
-                '<input name="metric" placeholder="e.g. new customers per month" style="width:100%;padding:8px"></label></p>')
+                '<input name="metric" placeholder="e.g. new customers per month" '
+                'value="' + _rnd_esc(pf.get("metric", "")) + '" style="width:100%;padding:8px"></label></p>')
     body.append('<p><label>Where it is today (a number)<br>'
-                '<input name="baseline" placeholder="e.g. 0" style="width:100%;padding:8px"></label></p>')
+                '<input name="baseline" placeholder="e.g. 0" '
+                'value="' + _rnd_esc(pf.get("baseline", "")) + '" style="width:100%;padding:8px"></label></p>')
     body.append('<p><label>Where I think it will go<br>'
-                '<input name="predicted" placeholder="e.g. more than 0" style="width:100%;padding:8px"></label></p>')
+                '<input name="predicted" placeholder="e.g. more than 0" '
+                'value="' + _rnd_esc(pf.get("predicted", "")) + '" style="width:100%;padding:8px"></label></p>')
     body.append('<p><label>When I will check <input type="date" name="review_date"></label></p>')
-    body.append('<p><button type="submit" class="btn">Log problem</button></p></form>')
+    body.append('<p><button type="submit" formaction="/rnd/workout" formnovalidate '
+                'class="btn" style="background:#7a4bd0">Work it out</button> '
+                '<button type="submit" class="btn">Log problem</button></p></form>')
     body.append('<h2 style="margin-top:36px">Passcode</h2>')
     if request.args.get("changed"):
         body.append('<p style="color:#127a2e"><b>Passcode changed.</b></p>')
@@ -5463,6 +5480,91 @@ def _rnd_new():
     cur.close()
     conn.close()
     return redirect("/rnd/" + str(pid))
+
+
+# --- RND_AI: "Work it out" via the Anthropic API (piece 2) -----------------
+import json as _rnd_json
+import urllib.request as _rnd_urlreq
+import urllib.error as _rnd_urlerr
+
+_RND_AI_MODEL = "claude-sonnet-5"   # cheaper: claude-haiku-4-5-20251001  |  deeper: claude-opus-5
+
+
+def _rnd_ai_workout(what_is, what_should_be, title, domain):
+    key = _rnd_os.environ.get("ANTHROPIC_API_KEY")
+    if not key:
+        return None, "No API key on the server (ANTHROPIC_API_KEY is not set in Render)."
+    prompt = (
+        "You are advising the owner of a small business. They work a problem as the GAP "
+        "between what is and what should be. Give a practical, concrete worked-out analysis.\n\n"
+        "Problem title: " + (title or "(none given)") + "\n"
+        "Domain: " + (domain or "(none given)") + "\n"
+        "WHAT IS (reality now): " + (what_is or "(blank)") + "\n"
+        "WHAT SHOULD BE (the goal): " + (what_should_be or "(blank)") + "\n\n"
+        "Write plain text with exactly these four numbered headers:\n"
+        "1. The problem\n2. Alternatives\n3. Recommended next step\n4. How to implement\n\n"
+        "Be specific to this business. Keep it tight, no fluff. Do not use markdown "
+        "symbols like # or *; just the numbered headers and short paragraphs or dashes."
+    )
+    payload = {
+        "model": _RND_AI_MODEL,
+        "max_tokens": 1500,
+        "messages": [{"role": "user", "content": prompt}],
+    }
+    data = _rnd_json.dumps(payload).encode("utf-8")
+    req = _rnd_urlreq.Request(
+        "https://api.anthropic.com/v1/messages",
+        data=data,
+        headers={
+            "content-type": "application/json",
+            "x-api-key": key,
+            "anthropic-version": "2023-06-01",
+        },
+        method="POST",
+    )
+    try:
+        with _rnd_urlreq.urlopen(req, timeout=60) as resp:
+            raw = resp.read().decode("utf-8")
+        obj = _rnd_json.loads(raw)
+        parts = [b.get("text", "") for b in obj.get("content", []) if b.get("type") == "text"]
+        text = "\n".join(p for p in parts if p).strip()
+        return (text, None) if text else (None, "The API responded but returned no text.")
+    except _rnd_urlerr.HTTPError as e:
+        try:
+            detail = e.read().decode("utf-8")[:300]
+        except Exception:
+            detail = ""
+        return None, "API error " + str(e.code) + ": " + detail
+    except Exception as e:
+        return None, "Could not reach the API: " + str(e)
+
+
+def _rnd_workout():
+    if not _rnd_is_admin():
+        return _RND_404
+    if not _rnd_unlocked():
+        return redirect("/rnd")
+    f = request.form
+    what_is = (f.get("what_is") or "").strip()
+    what_should = (f.get("what_should_be") or "").strip()
+    title = (f.get("title") or "").strip()
+    domain = f.get("domain") or ""
+    pf = {
+        "title": title, "what_is": what_is, "what_should_be": what_should,
+        "domain": domain, "size": f.get("size") or "small",
+        "metric": f.get("metric") or "", "baseline": f.get("baseline") or "",
+        "predicted": f.get("predicted") or "",
+    }
+    if not what_is and not what_should:
+        pf["notice"] = "Fill in What is and What should be first, then click Work it out."
+        return _rnd_list(pf)
+    text, err = _rnd_ai_workout(what_is, what_should, title, domain)
+    if err:
+        pf["notice"] = "Work it out couldn't run: " + err
+    else:
+        pf["analysis"] = text
+        pf["notice"] = "Draft ready below \u2014 review and edit it, then click Log problem to save."
+    return _rnd_list(pf)
 
 
 # --- RND_PROMPTS_V1: generic guiding questions per step --------------------
@@ -5784,6 +5886,7 @@ for _rnd_rule, _rnd_ep, _rnd_fn, _rnd_m in [
     ("/rnd/unlock", "rnd_unlock", _rnd_unlock, ["POST"]),
     ("/rnd/setcode", "rnd_setcode", _rnd_setcode, ["POST"]),
     ("/rnd/new", "rnd_new", _rnd_new, ["POST"]),
+    ("/rnd/workout", "rnd_workout", _rnd_workout, ["POST"]),
     ("/rnd/<int:pid>", "rnd_detail", _rnd_detail, ["GET"]),
     ("/rnd/<int:pid>/step", "rnd_step", _rnd_step, ["POST"]),
     ("/rnd/<int:pid>/close", "rnd_close", _rnd_close, ["POST"]),
