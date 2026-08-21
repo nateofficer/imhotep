@@ -5385,6 +5385,8 @@ def _rnd_list():
                 'placeholder="What is &mdash; the reality right now"></textarea></p>')
     body.append('<p><textarea name="what_should_be" rows="2" style="width:100%;padding:8px" '
                 'placeholder="What should be &mdash; where it should be"></textarea></p>')
+    body.append('<p style="color:#666;margin:14px 0 0"><b>Worked-out analysis</b> <span style="color:#999">(optional &mdash; the problem, the alternatives, and the recommended step)</span></p>')
+    body.append('<p><textarea name="analysis" rows="8" style="width:100%;padding:8px" placeholder="Type your analysis here, or leave it for the Work it out button to draft."></textarea></p>')
     body.append('<p>Domain: <select name="domain">' + opts + '</select></p>')
     body.append('<fieldset style="border:1px solid #ddd;padding:12px">'
                 '<legend><b>How big is this?</b></legend>')
