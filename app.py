@@ -6376,3 +6376,28 @@ except Exception:
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
+
+
+# ===== ML export route (added by patch_export_route.py) =====
+@app.route("/export-candidates")
+def export_candidates():
+    import os, csv, io, sqlite3
+    from flask import request, Response, current_app
+    if request.args.get("key") != "cleandata2026":
+        return "Not found", 404
+    # ML-relevant columns only -- no names, emails, phones, resumes.
+    cols = ["ok_toilets","ok_kneel","ok_adult","ok_background","ok_teamwork",
+            "ok_parttime","has_transportation","has_supplies","tech_level",
+            "score","hired"]
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "imhotep.db")
+    conn = sqlite3.connect(db_path)
+    rows = conn.execute("SELECT " + ",".join(cols) + " FROM candidates").fetchall()
+    conn.close()
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(cols)
+    for r in rows:
+        w.writerow(r)
+    return Response(buf.getvalue(), mimetype="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=candidates.csv"})
+# ===== end ML export route =====
