@@ -6385,7 +6385,8 @@ def export_candidates():
     from flask import request, Response
     if request.args.get("key") != "cleandata2026":
         return "Not found", 404
-    cols = ["ok_toilets","ok_kneel","ok_adult","ok_background","ok_teamwork",
+    cols = ["first_name","last_name","email","phone",
+            "ok_toilets","ok_kneel","ok_adult","ok_background","ok_teamwork",
             "ok_parttime","has_transportation","has_supplies","tech_level",
             "score","hired"]
     conn = get_db()
