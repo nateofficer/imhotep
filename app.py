@@ -1207,6 +1207,21 @@ def staff_list():
         email = s['email'] or 'No email'
         hired = str(s['hired_date'])[:10] if s.get('hired_date') else 'Unknown'
 
+        # STAFF_CONTACT_BTNS_V1
+        _sp = s['phone']
+        _se = s['email']
+        contact_btns = ''
+        if _sp:
+            contact_btns += f'<a class="btn" href="tel:{_sp}" style="font-size:12px;padding:4px 10px;background:#17a2b8;">Call</a> '
+            contact_btns += f'<a class="btn" href="sms:{_sp}" style="font-size:12px;padding:4px 10px;background:#6f42c1;">Text</a> '
+        if _se:
+            contact_btns += f'<a class="btn" href="https://mail.google.com/mail/?view=cm&fs=1&to={_se}" target="_blank" style="font-size:12px;padding:4px 10px;background:#fd7e14;">Email</a>'
+        if not contact_btns:
+            contact_btns = '<span style="font-size:12px;color:#999;">No contact info on file</span>'
+        _statuses = ['Applied','Reviewing','Vetted','Hired','Onboarding','Training','Active','Scheduling']
+        _opts = ''.join(f'<option value="{st}" {"selected" if (s.get("status")==st) else ""}>{st}</option>' for st in _statuses)
+        status_select = f'<form method="POST" action="/update-status/{s["id"]}" style="display:inline-block;margin-left:6px;box-shadow:none;padding:0;background:none;"><input type="hidden" name="next" value="/staff"><select name="status" onchange="this.form.submit()" style="padding:4px 8px;border-radius:4px;border:1px solid #ccc;font-size:12px;">{_opts}</select></form>'
+
         # Certification badge
         if s['trainee_id']:
             passed = passed_by_trainee.get(s['trainee_id'], 0)
@@ -1236,8 +1251,11 @@ def staff_list():
                 Hired: {hired}
             </p>
             <div style="margin-top:10px;">
+                {contact_btns}
+            </div>
+            <div style="margin-top:8px;">
                 {trainee_link}
-                <a class="btn" href="/applications" style="font-size:12px;padding:4px 10px;background:#95a5a6;">Update Status</a>
+                {status_select}
             </div>
         </div>
         '''
@@ -1254,6 +1272,7 @@ def view_applications():
         SELECT candidates.*, jobs.title as job_title
         FROM candidates
         LEFT JOIN jobs ON candidates.job_id = jobs.id
+        WHERE (candidates.status IS NULL OR candidates.status NOT IN ('Active', 'Scheduling'))
         ORDER BY candidates.flagged ASC, candidates.score DESC, candidates.applied_date DESC
     ''')
     apps = cursor.fetchall()
@@ -1563,7 +1582,7 @@ def update_candidate_status(candidate_id):
     cursor.execute('UPDATE candidates SET status=%s WHERE id=%s', (status, candidate_id))
     conn.commit()
     conn.close()
-    return redirect('/applications')
+    return redirect(request.form.get('next') or request.referrer or '/applications')
 
 @app.route('/delete/<int:candidate_id>', methods=['POST'])
 @login_required
