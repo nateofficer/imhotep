@@ -3272,10 +3272,10 @@ def crm_delete(lead_id):
     return redirect('/crm')
 
 
-QUOTE_BASE = 80.0
-QUOTE_PER_BED = 22.0
-QUOTE_PER_BATH = 30.0
-QUOTE_PER_SQFT = 0.012
+QUOTE_BASE = 17.0
+QUOTE_PER_BED = 25.0
+QUOTE_PER_BATH = 50.0
+QUOTE_PER_SQFT = 0.010
 QUOTE_MIN = 150.0
 
 QUOTE_TYPE_MULT = {
@@ -3285,9 +3285,9 @@ QUOTE_TYPE_MULT = {
     'airbnb': 1.00,
 }
 QUOTE_FREQ_MULT = {
-    'weekly': 0.88,
-    'biweekly': 0.94,
-    'monthly': 0.97,
+    'weekly': 0.82,
+    'biweekly': 0.90,
+    'monthly': 1.00,
     'onetime': 1.15,
 }
 QUOTE_TYPE_LABEL = {
@@ -3717,13 +3717,13 @@ function toggleFreq(){
 toggleFreq();
 
 var TYPE_MULT = {standard:1.00, deep:1.43, moveout:1.60, airbnb:1.00};
-var FREQ_MULT = {weekly:0.88, biweekly:0.94, monthly:0.97, onetime:1.15};
+var FREQ_MULT = {weekly:0.82, biweekly:0.90, monthly:1.00, onetime:1.15};
 
 function estimate(){
   var bed  = +document.getElementById('bed').value;
   var bath = +document.getElementById('bath').value;
   var sqft = +document.getElementById('sqft').value;
-  var p = 80 + 22*bed + 30*bath + 0.012*sqft;
+  var p = 17 + 25*bed + 50*bath + 0.010*sqft;
   p = p * (TYPE_MULT[state.type] || 1);
   if(state.type === 'standard' || state.type === 'airbnb'){
     p = p * (FREQ_MULT[state.freq] || 1);
