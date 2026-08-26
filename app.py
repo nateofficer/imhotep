@@ -1254,12 +1254,152 @@ def staff_list():
                 {contact_btns}
             </div>
             <div style="margin-top:8px;">
+                <a class="btn" href="/staff/{s["id"]}" style="font-size:12px;padding:4px 10px;">View Full Info</a>
                 {trainee_link}
                 {status_select}
             </div>
         </div>
         '''
     html += '</div>'
+    return html
+
+
+@app.route('/staff/<int:candidate_id>')
+@login_required
+def staff_detail(candidate_id):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT candidates.*, jobs.title as job_title
+        FROM candidates
+        LEFT JOIN jobs ON candidates.job_id = jobs.id
+        WHERE candidates.id = %s
+    """, (candidate_id,))
+    c = cursor.fetchone()
+    if not c:
+        conn.close()
+        return STYLE + admin_nav() + '<h1>Staff</h1><div class="info"><p>No such staff member. <a href="/staff">Back to Staff</a></p></div>'
+
+    cursor.execute("SELECT * FROM trainees WHERE candidate_id = %s ORDER BY id DESC LIMIT 1", (candidate_id,))
+    tr = cursor.fetchone()
+
+    interview = None
+    try:
+        cursor.execute("SELECT * FROM phone_interviews WHERE candidate_id = %s ORDER BY id DESC LIMIT 1", (candidate_id,))
+        interview = cursor.fetchone()
+    except Exception:
+        interview = None
+
+    modules = []
+    if tr:
+        try:
+            cursor.execute("""
+                SELECT training_modules.title AS title,
+                       training_modules.required AS required,
+                       module_progress.passed AS passed,
+                       module_progress.score AS score,
+                       module_progress.attempts AS attempts,
+                       module_progress.completed_date AS completed_date
+                FROM training_modules
+                LEFT JOIN module_progress
+                       ON module_progress.module_id = training_modules.id
+                      AND module_progress.trainee_id = %s
+                ORDER BY training_modules.id
+            """, (tr["id"],))
+            modules = cursor.fetchall()
+        except Exception:
+            modules = []
+    conn.close()
+
+    name = (c["first_name"] or "") + " " + (c["last_name"] or "")
+    status = c.get("status") or "Active"
+    _sp = c["phone"]
+    _se = c["email"]
+    contact_btns = ""
+    if _sp:
+        contact_btns += f'<a class="btn" href="tel:{_sp}" style="background:#17a2b8;">Call</a> '
+        contact_btns += f'<a class="btn" href="sms:{_sp}" style="background:#6f42c1;">Text</a> '
+    if _se:
+        contact_btns += f'<a class="btn" href="https://mail.google.com/mail/?view=cm&fs=1&to={_se}" target="_blank" style="background:#fd7e14;">Email</a>'
+
+    docs = ""
+    if c["resume_filename"]:
+        _r = c["resume_filename"]
+        _rhref = _r if str(_r).startswith("http") else "/resume/" + str(_r)
+        docs += f'<a class="btn" href="{_rhref}" target="_blank">View Resume</a> '
+    else:
+        docs += '<span style="color:#999;">No resume on file</span> '
+    if c["license_filename"]:
+        docs += f'<a class="btn" href="/resume/{c["license_filename"]}" target="_blank">View Driver&#39;s License</a>'
+
+    score = c["score"] if c["score"] is not None else 0
+    tech_level = c["tech_level"] if c["tech_level"] is not None else "Not answered"
+
+    html = STYLE + admin_nav()
+    html += '<p style="margin:0 0 8px 0;"><a href="/staff">&larr; Back to Staff</a></p>'
+    html += f'<h1 style="margin-bottom:4px;">{name}</h1>'
+    html += f'<p style="margin:2px 0 12px 0;"><span style="background:#27ae60;color:white;padding:2px 10px;border-radius:4px;font-size:13px;font-weight:bold;">{status}</span> '
+    html += f'<span class="score-badge {score_class(score)}">App Score: {score}/100</span></p>'
+    html += f'<p style="margin:8px 0;">{contact_btns}</p>'
+
+    html += '<div class="application" style="margin-top:12px;"><h2>Application</h2>'
+    html += f'<p><strong>Position:</strong> {c.get("job_title") or "N/A"}</p>'
+    html += f'<p><strong>Email:</strong> {c["email"] or "&mdash;"}</p>'
+    html += f'<p><strong>Phone:</strong> {c["phone"] or "&mdash;"}</p>'
+    html += f'<p><strong>Applied:</strong> {c["applied_date"]}</p>'
+    html += f'<p style="margin-top:10px;">{docs}</p>'
+    html += '<div class="screening-section"><h3>Screening Answers</h3>'
+    html += f'<div class="answer-row"><strong>Comfortable cleaning toilets/bathrooms:</strong> {yes_no(c["ok_toilets"])}</div>'
+    html += f'<div class="answer-row"><strong>Able to kneel for hand-towel cleaning:</strong> {yes_no(c["ok_kneel"])}</div>'
+    html += f'<div class="answer-row"><strong>18 or older:</strong> {yes_no(c["ok_adult"])}</div>'
+    html += f'<div class="answer-row"><strong>Can pass background check:</strong> {yes_no(c["ok_background"])}</div>'
+    html += f'<div class="answer-row"><strong>Can work in a team AND individually:</strong> {yes_no(c["ok_teamwork"])}</div>'
+    html += f'<div class="answer-row"><strong>Available 15-20 hrs/week part-time:</strong> {yes_no(c["ok_parttime"])}</div>'
+    html += f'<div class="answer-row"><strong>Tech/internet comfort (1-5):</strong> {tech_level}</div>'
+    html += f'<div class="answer-row"><strong>Has own transportation:</strong> {yes_no(c["has_transportation"])}</div>'
+    html += f'<div class="answer-row"><strong>Has own cleaning supplies:</strong> {yes_no(c["has_supplies"])}</div>'
+    html += '</div></div>'
+
+    html += '<div class="application" style="margin-top:12px;"><h2>Phone Interview</h2>'
+    if interview and interview.get("total_score") is not None:
+        _iv = interview["total_score"]
+        html += f'<p><span class="score-badge {score_class(_iv)}">Interview: {_iv}/100</span></p>'
+        if interview.get("recommendation"):
+            html += f'<p><strong>Recommendation:</strong> {interview["recommendation"]}</p>'
+        if interview.get("interview_date"):
+            html += f'<p><strong>Date:</strong> {interview["interview_date"]}</p>'
+        if interview.get("notes"):
+            html += f'<p><strong>Notes:</strong> {interview["notes"]}</p>'
+    else:
+        html += '<p style="color:#999;">No phone interview recorded.</p>'
+    html += f'<p style="margin-top:8px;"><a class="btn" href="/admin/candidate/{candidate_id}/interview" style="background:#2c3e50;">Open Interview Form</a></p>'
+    html += '</div>'
+
+    html += '<div class="application" style="margin-top:12px;"><h2>Training &amp; Test Results</h2>'
+    if not tr:
+        html += '<p style="color:#999;">No training record yet.</p>'
+    elif not modules:
+        html += '<p style="color:#999;">No training modules found.</p>'
+    else:
+        html += '<div class="screening-section">'
+        for m in modules:
+            _title = m["title"]
+            _req = ' <span style="color:#e67e22;font-size:11px;">(required)</span>' if m.get("required") else ''
+            if m.get("passed"):
+                _sc = m.get("score")
+                _scs = f' &mdash; {_sc}%' if _sc is not None else ''
+                _badge = f'<span style="background:#27ae60;color:white;padding:2px 8px;border-radius:4px;font-size:12px;">PASSED{_scs}</span>'
+            elif m.get("attempts"):
+                _badge = f'<span style="background:#e74c3c;color:white;padding:2px 8px;border-radius:4px;font-size:12px;">Attempted, not passed ({m.get("attempts")} tries)</span>'
+            else:
+                _badge = '<span style="background:#95a5a6;color:white;padding:2px 8px;border-radius:4px;font-size:12px;">Not started</span>'
+            _done = f' <span style="color:#888;font-size:11px;">{str(m.get("completed_date"))[:10]}</span>' if m.get("completed_date") else ''
+            html += f'<div class="answer-row"><strong>{_title}</strong>{_req} &nbsp; {_badge}{_done}</div>'
+        html += '</div>'
+    if tr:
+        html += f'<p style="margin-top:8px;"><a class="btn" href="/trainee/{tr["id"]}" style="font-size:13px;">Full Training Record</a></p>'
+    html += '</div>'
+
     return html
 
 
