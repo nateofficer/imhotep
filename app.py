@@ -3041,6 +3041,13 @@ def init_crm_db():
         except Exception:
             pass
     try:
+        cursor.execute('SELECT city FROM leads LIMIT 1')
+    except Exception:
+        try:
+            cursor.execute('ALTER TABLE leads ADD COLUMN city VARCHAR(50)')
+        except Exception:
+            pass
+    try:
         cursor.execute('''CREATE TABLE IF NOT EXISTS quote_events (
             id INT AUTO_INCREMENT PRIMARY KEY,
             event VARCHAR(20),
@@ -3174,12 +3181,25 @@ def _crm_email_buttons(leads):
 @login_required
 def crm_list():
     status_filter = request.args.get('status', 'all')
+    city_filter = request.args.get('city', 'all')
     conn = get_db()
     cursor = conn.cursor()
+    _where, _params = [], []
     if status_filter != 'all':
-        cursor.execute('SELECT * FROM leads WHERE status = %s ORDER BY created_date DESC', (status_filter,))
-    else:
-        cursor.execute('SELECT * FROM leads ORDER BY created_date DESC')
+        _where.append('status = %s'); _params.append(status_filter)
+    if city_filter != 'all':
+        _where.append('city = %s'); _params.append(city_filter)
+    _q = 'SELECT * FROM leads'
+    if _where:
+        _q += ' WHERE ' + ' AND '.join(_where)
+    _q += ' ORDER BY created_date DESC'
+    try:
+        cursor.execute(_q, tuple(_params))
+    except Exception:
+        if status_filter != 'all':
+            cursor.execute('SELECT * FROM leads WHERE status = %s ORDER BY created_date DESC', (status_filter,))
+        else:
+            cursor.execute('SELECT * FROM leads ORDER BY created_date DESC')
     leads = cursor.fetchall()
     cursor.execute('SELECT status, COUNT(*) as cnt FROM leads GROUP BY status')
     counts = {row['status']: row['cnt'] for row in cursor.fetchall()}
@@ -3196,6 +3216,11 @@ def crm_list():
         <a href="/crm?status=new" style="margin-right:10px;color:#3498db;">New ({new_count})</a>
         <a href="/crm?status=in_progress" style="margin-right:10px;color:#f39c12;">In Progress ({inprog_count})</a>
         <a href="/crm?status=done" style="color:#27ae60;">Done ({done_count})</a>
+    </div>
+    <div style="margin-bottom:15px;">
+        <a href="/crm" style="margin-right:10px;color:#8e44ad;font-weight:bold;">All Areas</a>
+        <a href="/crm?city=Las+Vegas" style="margin-right:10px;color:#8e44ad;">Las Vegas</a>
+        <a href="/crm?city=Salt+Lake+City" style="color:#8e44ad;">Salt Lake City</a>
     </div>
     '''
 
@@ -3246,9 +3271,20 @@ def crm_list():
             else:
                 source_badge = ''
 
+            _city = None
+            try:
+                _city = lead["city"]
+            except Exception:
+                _city = None
+            if _city:
+                _cc = {'las vegas': '#c0392b', 'salt lake city': '#2980b9'}.get(str(_city).lower(), '#7f8c8d')
+                city_badge = f'<span style="background:{_cc};color:#fff;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:600;margin-left:6px;">{_city}</span>'
+            else:
+                city_badge = ''
+
             html += f'''
             <div class="application">
-                <h2>{lead["first_name"]} {lead["last_name"]} {status_badge(lead["status"])} {source_badge}</h2>
+                <h2>{lead["first_name"]} {lead["last_name"]} {status_badge(lead["status"])} {source_badge}{city_badge}</h2>
                 <p><strong>Service:</strong> {lead["service_type"] or "Not specified"} &nbsp;|&nbsp;
                    <strong>Phone:</strong> {lead["phone"] or "N/A"} &nbsp;|&nbsp;
                    <strong>Email:</strong> {lead["email"] or "N/A"}</p>
@@ -3579,6 +3615,7 @@ def quote_price():
     bathrooms = request.form.get('bathrooms', '2')
     sqft = request.form.get('sqft', '2000')
     source = (request.form.get('source') or 'unknown').strip()[:100]
+    city = (request.form.get('city') or '').strip()[:50]
 
     if not first_name or not email:
         return {'ok': False, 'error': 'Name and email are required.'}, 400
@@ -3590,6 +3627,8 @@ def quote_price():
         type_label, freq_label, bedrooms, bathrooms, sqft, price)
     if address:
         full_notes += " | Address: " + address
+    if city:
+        full_notes += " | Area: " + city
     if notes:
         full_notes += " | Notes: " + notes
 
@@ -3598,12 +3637,17 @@ def quote_price():
         cursor = conn.cursor()
         try:
             cursor.execute(
-                "INSERT INTO leads (first_name, last_name, phone, email, address, service_type, status, notes, source) VALUES (%s,%s,%s,%s,%s,%s,'new',%s,%s)",
-                (first_name, last_name, phone, email, address, cleaning_type, full_notes, source))
+                "INSERT INTO leads (first_name, last_name, phone, email, address, service_type, status, notes, source, city) VALUES (%s,%s,%s,%s,%s,%s,'new',%s,%s,%s)",
+                (first_name, last_name, phone, email, address, cleaning_type, full_notes, source, city))
         except Exception:
-            cursor.execute(
-                "INSERT INTO leads (first_name, last_name, phone, email, address, service_type, status, notes) VALUES (%s,%s,%s,%s,%s,%s,'new',%s)",
-                (first_name, last_name, phone, email, address, cleaning_type, full_notes))
+            try:
+                cursor.execute(
+                    "INSERT INTO leads (first_name, last_name, phone, email, address, service_type, status, notes, source) VALUES (%s,%s,%s,%s,%s,%s,'new',%s,%s)",
+                    (first_name, last_name, phone, email, address, cleaning_type, full_notes, source))
+            except Exception:
+                cursor.execute(
+                    "INSERT INTO leads (first_name, last_name, phone, email, address, service_type, status, notes) VALUES (%s,%s,%s,%s,%s,%s,'new',%s)",
+                    (first_name, last_name, phone, email, address, cleaning_type, full_notes))
         conn.commit()
         conn.close()
     except Exception as _e:
@@ -3806,6 +3850,12 @@ def render_quote_page(source):
   <div class="card" id="gate">
     <h2>Like your estimate? Lock it in.</h2>
     <p class="sub">Enter your info and we&rsquo;ll lock in this estimate and reach out to schedule your clean. No cost, no obligation.</p>
+    <div class="fld"><label>Which area? *</label>
+      <select id="city" style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px;font-size:16px;">
+        <option value="Las Vegas">Las Vegas</option>
+        <option value="Salt Lake City">Salt Lake City</option>
+      </select>
+    </div>
     <div class="two">
       <div class="fld"><label>First name *</label><input id="fn" required></div>
       <div class="fld"><label>Email *</label><input id="em" type="email" required></div>
@@ -3884,6 +3934,15 @@ function estimate(){
 
 estimate();
 
+/* LEAD_CITY_PRESELECT: /quote?city=slc or ?city=lv pre-picks the area */
+(function(){
+  var cp = (new URLSearchParams(location.search).get('city')||'').toLowerCase();
+  var sel = document.getElementById('city');
+  if(!sel) return;
+  if(cp==='slc'||cp==='saltlake'||cp==='salt-lake'||cp==='ut'){ sel.value='Salt Lake City'; }
+  else if(cp==='lv'||cp==='vegas'||cp==='lasvegas'||cp==='nv'){ sel.value='Las Vegas'; }
+})();
+
 document.getElementById('go').addEventListener('click', function(){
   var fn = document.getElementById('fn').value.trim();
   var ph = document.getElementById('ph').value.trim();
@@ -3910,6 +3969,7 @@ document.getElementById('go').addEventListener('click', function(){
   d.append('bathrooms', document.getElementById('bath').value);
   d.append('sqft', document.getElementById('sqft').value);
   d.append('source', SOURCE);
+  d.append('city', (document.getElementById('city')||{}).value || '');
 
   fetch('/quote/price', {method:'POST', body:d})
     .then(function(r){ return r.json(); })
