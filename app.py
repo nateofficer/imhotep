@@ -4451,7 +4451,7 @@ def schedule_list():
         crew_by_job.setdefault(row['cleaning_job_id'], []).append(row)
 
     html = STYLE + admin_nav() + '<h1>Scheduling</h1>'
-    html += '<p><a class="btn btn-success" href="/schedule/new">+ Schedule a Job</a> <a class="btn" href="/schedule/calendar" style="background:#8e44ad;">&#128197; Calendar</a> <a class="btn" href="/schedule/availability" style="background:#16a085;">&#128337; Availability</a> <a class="btn" href="/schedule/timesheets" style="background:#5C3D2E;">Timesheets</a></p>'
+    html += '<p><a class="btn btn-success" href="/schedule/new">+ Schedule a Job</a> <a class="btn" href="/schedule/calendar" style="background:#8e44ad;">&#128197; Calendar</a> <a class="btn" href="/schedule/availability" style="background:#16a085;">&#128337; Availability</a> <a class="btn" href="/schedule/timesheets" style="background:#5C3D2E;">Timesheets</a> <a class="btn" href="/payroll" style="background:#c0392b;">&#128176; Payroll</a></p>'
 
     if not jobs:
         html += '<div class="info"><p>No jobs scheduled yet. You\'ll need at least one customer first -- see <a href="/customers">Customers</a>.</p></div>'
@@ -4992,6 +4992,237 @@ def schedule_availability_delete(av_id):
         pass
     conn.close()
     return redirect('/schedule/availability')
+
+
+def _payroll_compute(punches, state, rate):
+    """punches: list of (clock_in dt, clock_out dt). Returns (reg, ot, dt, gross)."""
+    import datetime as _dt
+    from collections import defaultdict
+    day_hours = defaultdict(float)
+    for cin, cout in punches:
+        if cin and cout:
+            day_hours[cin.date()] += (cout - cin).total_seconds() / 3600.0
+    under18 = (rate is None) or (float(rate) < 18.0)
+    day_split = {}
+    for d, h in day_hours.items():
+        if state == 'NV' and under18:
+            reg = min(h, 8.0)
+            ot = max(0.0, min(h, 12.0) - 8.0)
+            dtt = max(0.0, h - 12.0)
+        else:
+            reg, ot, dtt = h, 0.0, 0.0
+        day_split[d] = [reg, ot, dtt]
+    total_reg = 0.0
+    total_ot = 0.0
+    total_dt = 0.0
+    for d in day_split:
+        total_ot += day_split[d][1]
+        total_dt += day_split[d][2]
+    week_reg = defaultdict(float)
+    for d in day_split:
+        wk = d - _dt.timedelta(days=d.weekday())
+        week_reg[wk] += day_split[d][0]
+    for wk in week_reg:
+        wreg = week_reg[wk]
+        if wreg > 40.0:
+            total_reg += 40.0
+            total_ot += (wreg - 40.0)
+        else:
+            total_reg += wreg
+    r = float(rate) if rate is not None else 0.0
+    gross = total_reg * r + total_ot * r * 1.5 + total_dt * r * 2.0
+    return round(total_reg, 2), round(total_ot, 2), round(total_dt, 2), round(gross, 2)
+
+
+def _payroll_roster():
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT pay_rate FROM candidates LIMIT 1")
+    except Exception:
+        try:
+            cursor.execute("ALTER TABLE candidates ADD COLUMN pay_rate DECIMAL(6,2)")
+        except Exception:
+            pass
+    try:
+        cursor.execute("SELECT work_state FROM candidates LIMIT 1")
+    except Exception:
+        try:
+            cursor.execute("ALTER TABLE candidates ADD COLUMN work_state VARCHAR(2)")
+        except Exception:
+            pass
+    conn.commit()
+    cursor.execute("""
+        SELECT candidates.id, candidates.first_name, candidates.last_name,
+               candidates.pay_rate, candidates.work_state
+        FROM trainees JOIN candidates ON trainees.candidate_id = candidates.id
+        ORDER BY candidates.first_name
+    """)
+    roster = cursor.fetchall()
+    conn.close()
+    return roster
+
+
+def _payroll_period(args):
+    import datetime as _dt
+    today = _dt.date.today()
+    try:
+        end = _dt.date.fromisoformat(args.get("end", ""))
+    except Exception:
+        end = today
+    try:
+        start = _dt.date.fromisoformat(args.get("start", ""))
+    except Exception:
+        start = end - _dt.timedelta(days=13)
+    return start, end
+
+
+@app.route('/payroll', methods=['GET', 'POST'])
+@login_required
+def payroll():
+    import datetime as _dt
+    if request.method == 'POST' and request.form.get('action') == 'save_rates':
+        conn = get_db(); cursor = conn.cursor()
+        for r in _payroll_roster():
+            rid = r["id"]
+            rate = (request.form.get("rate_%d" % rid, "") or "").strip()
+            st = ((request.form.get("state_%d" % rid, "NV") or "NV").strip().upper()[:2]) or "NV"
+            try:
+                cursor.execute("UPDATE candidates SET pay_rate=%s, work_state=%s WHERE id=%s",
+                               (float(rate) if rate else None, st, rid))
+            except Exception:
+                pass
+        conn.commit(); conn.close()
+        qs = ""
+        if request.form.get("start") and request.form.get("end"):
+            qs = "?start=" + request.form.get("start") + "&end=" + request.form.get("end")
+        return redirect("/payroll" + qs)
+
+    start, end = _payroll_period(request.args)
+    roster = _payroll_roster()
+    conn = get_db(); cursor = conn.cursor()
+    rows = []
+    tot_reg = tot_ot = tot_dt = tot_gross = 0.0
+    open_flags = []
+    for r in roster:
+        cursor.execute(
+            "SELECT clock_in, clock_out FROM time_punches WHERE candidate_id=%s AND clock_out IS NOT NULL AND DATE(clock_in) BETWEEN %s AND %s",
+            (r["id"], start, end))
+        punches = [(p["clock_in"], p["clock_out"]) for p in cursor.fetchall()]
+        st = (r["work_state"] or "NV")
+        reg, ot, dtt, gross = _payroll_compute(punches, st, r["pay_rate"])
+        rows.append((r, st, reg, ot, dtt, gross))
+        tot_reg += reg; tot_ot += ot; tot_dt += dtt; tot_gross += gross
+        cursor.execute(
+            "SELECT COUNT(*) AS c FROM time_punches WHERE candidate_id=%s AND clock_out IS NULL AND DATE(clock_in) BETWEEN %s AND %s",
+            (r["id"], start, end))
+        oc = cursor.fetchone()
+        if oc and oc["c"]:
+            open_flags.append(r["first_name"] + " " + r["last_name"])
+    conn.close()
+
+    today = _dt.date.today()
+    this_mon = today - _dt.timedelta(days=today.weekday())
+    last_mon = this_mon - _dt.timedelta(days=7)
+    def _preset(label, s, e):
+        return ('<a class="btn" href="/payroll?start=' + s.isoformat() + '&end=' + e.isoformat()
+                + '" style="font-size:12px;padding:4px 10px;background:#7f8c8d;">' + label + '</a> ')
+
+    html = STYLE + admin_nav() + '<h1>Payroll</h1>'
+    html += '<p style="color:#666;margin-top:-6px;">Gross pay from clocked hours. This is not tax withholding &mdash; hand the totals to your payroll processor.</p>'
+    html += '<p>' + _preset("This week", this_mon, today)
+    html += _preset("Last week", last_mon, last_mon + _dt.timedelta(days=6))
+    html += _preset("Last 2 weeks", today - _dt.timedelta(days=13), today) + '</p>'
+    html += ('<form method="GET" action="/payroll" style="margin:8px 0 16px;">'
+             '<label>From <input type="date" name="start" value="' + start.isoformat() + '"></label> '
+             '<label>To <input type="date" name="end" value="' + end.isoformat() + '"></label> '
+             '<button class="btn" type="submit">Show</button></form>')
+    html += '<h3 style="margin:6px 0;">Period: ' + start.isoformat() + ' to ' + end.isoformat() + '</h3>'
+
+    if open_flags:
+        html += ('<div style="background:#fdecea;border-left:4px solid #e74c3c;padding:8px 12px;margin:8px 0;font-size:13px;">'
+                 '<strong>Still clocked in (not counted):</strong> ' + ", ".join(open_flags)
+                 + '. Excluded until they clock out.</div>')
+
+    if not roster:
+        html += '<p style="color:#999;">No trained crew yet.</p>'
+        return html
+
+    html += '<table style="width:100%;border-collapse:collapse;margin-bottom:10px;">'
+    html += ('<tr style="background:#2c3e50;color:#fff;font-size:13px;">'
+             '<th style="padding:8px;text-align:left;">Employee</th><th style="padding:8px;">State</th>'
+             '<th style="padding:8px;">Rate</th><th style="padding:8px;">Reg hrs</th>'
+             '<th style="padding:8px;">OT 1.5x</th><th style="padding:8px;">DT 2x</th>'
+             '<th style="padding:8px;">Gross</th></tr>')
+    for (r, st, reg, ot, dtt, gross) in rows:
+        rate_disp = ("$%.2f" % float(r["pay_rate"])) if r["pay_rate"] is not None else '<span style="color:#e74c3c;">set rate</span>'
+        html += ('<tr style="border-bottom:1px solid #eee;font-size:13px;">'
+                 '<td style="padding:8px;">' + r["first_name"] + " " + r["last_name"] + '</td>'
+                 '<td style="padding:8px;text-align:center;">' + st + '</td>'
+                 '<td style="padding:8px;text-align:right;">' + rate_disp + '</td>'
+                 '<td style="padding:8px;text-align:right;">' + ("%.2f" % reg) + '</td>'
+                 '<td style="padding:8px;text-align:right;">' + ("%.2f" % ot) + '</td>'
+                 '<td style="padding:8px;text-align:right;">' + ("%.2f" % dtt) + '</td>'
+                 '<td style="padding:8px;text-align:right;font-weight:bold;">$' + ("%.2f" % gross) + '</td></tr>')
+    html += ('<tr style="background:#f4f6f8;font-weight:bold;font-size:13px;">'
+             '<td style="padding:8px;" colspan="3">Total</td>'
+             '<td style="padding:8px;text-align:right;">' + ("%.2f" % tot_reg) + '</td>'
+             '<td style="padding:8px;text-align:right;">' + ("%.2f" % tot_ot) + '</td>'
+             '<td style="padding:8px;text-align:right;">' + ("%.2f" % tot_dt) + '</td>'
+             '<td style="padding:8px;text-align:right;">$' + ("%.2f" % tot_gross) + '</td></tr>')
+    html += '</table>'
+    html += ('<p><a class="btn" href="/payroll/export?start=' + start.isoformat() + '&end=' + end.isoformat()
+             + '" style="background:#16a085;">&#128190; Download CSV</a></p>')
+
+    html += '<div class="application" style="margin-top:18px;"><h2>Pay Rates</h2>'
+    html += '<p style="color:#666;font-size:13px;">Set the hourly rate and work state for each person. Vegas = NV (daily overtime past 8 hrs), Salt Lake = UT (weekly overtime past 40 only).</p>'
+    html += '<form method="POST" action="/payroll">'
+    html += '<input type="hidden" name="action" value="save_rates">'
+    html += '<input type="hidden" name="start" value="' + start.isoformat() + '">'
+    html += '<input type="hidden" name="end" value="' + end.isoformat() + '">'
+    html += '<table style="border-collapse:collapse;">'
+    for r in roster:
+        cur_rate = ("%.2f" % float(r["pay_rate"])) if r["pay_rate"] is not None else ""
+        cur_state = (r["work_state"] or "NV")
+        nv_sel = " selected" if cur_state == "NV" else ""
+        ut_sel = " selected" if cur_state == "UT" else ""
+        html += ('<tr><td style="padding:5px 10px 5px 0;">' + r["first_name"] + " " + r["last_name"] + '</td>'
+                 '<td style="padding:5px;">$<input type="number" step="0.01" min="0" name="rate_' + str(r["id"]) + '" value="' + cur_rate + '" style="width:80px;padding:5px;"></td>'
+                 '<td style="padding:5px;"><select name="state_' + str(r["id"]) + '" style="padding:5px;">'
+                 '<option value="NV"' + nv_sel + '>NV (Las Vegas)</option>'
+                 '<option value="UT"' + ut_sel + '>UT (Salt Lake)</option>'
+                 '</select></td></tr>')
+    html += '</table>'
+    html += '<button class="btn btn-success" type="submit" style="margin-top:8px;">Save Rates</button>'
+    html += '</form></div>'
+    return html
+
+
+@app.route('/payroll/export')
+@login_required
+def payroll_export():
+    import io, csv
+    start, end = _payroll_period(request.args)
+    roster = _payroll_roster()
+    conn = get_db(); cursor = conn.cursor()
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(["Employee", "State", "Rate", "Reg Hours", "OT Hours 1.5x", "DT Hours 2x", "Gross Pay", "Period Start", "Period End"])
+    for r in roster:
+        cursor.execute(
+            "SELECT clock_in, clock_out FROM time_punches WHERE candidate_id=%s AND clock_out IS NOT NULL AND DATE(clock_in) BETWEEN %s AND %s",
+            (r["id"], start, end))
+        punches = [(p["clock_in"], p["clock_out"]) for p in cursor.fetchall()]
+        st = (r["work_state"] or "NV")
+        reg, ot, dtt, gross = _payroll_compute(punches, st, r["pay_rate"])
+        rate_val = ("%.2f" % float(r["pay_rate"])) if r["pay_rate"] is not None else ""
+        w.writerow([r["first_name"] + " " + r["last_name"], st, rate_val,
+                    "%.2f" % reg, "%.2f" % ot, "%.2f" % dtt, "%.2f" % gross,
+                    start.isoformat(), end.isoformat()])
+    conn.close()
+    fname = "payroll_" + start.isoformat() + "_to_" + end.isoformat() + ".csv"
+    return (out.getvalue(), 200, {"Content-Type": "text/csv",
+            "Content-Disposition": 'attachment; filename="' + fname + '"'})
 
 
 @app.route('/schedule/timesheets')
