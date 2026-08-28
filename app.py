@@ -3352,7 +3352,18 @@ def crm_new():
     if request.method == 'POST':
         conn = get_db()
         cursor = conn.cursor()
-        cursor.execute('''INSERT INTO leads
+        try:
+            cursor.execute('''INSERT INTO leads
+                          (first_name, last_name, phone, email, address, service_type, status, notes, lead_source_id, city)
+                          VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
+                       (request.form['first_name'], request.form['last_name'],
+                        request.form.get('phone', ''), request.form.get('email', ''),
+                        request.form.get('address', ''), request.form.get('service_type', ''),
+                        request.form.get('status', 'new'), request.form.get('notes', ''),
+                        request.form.get('lead_source_id') or None,
+                        request.form.get('city', '') or None))
+        except Exception:
+            cursor.execute('''INSERT INTO leads
                           (first_name, last_name, phone, email, address, service_type, status, notes, lead_source_id)
                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)''',
                        (request.form['first_name'], request.form['last_name'],
@@ -3379,6 +3390,12 @@ def crm_new():
         <input type="email" name="email">
         <label>Address:</label>
         <input type="text" name="address" placeholder="Street, City, State">
+        <label>City / Market:</label>
+        <select name="city">  <!--crm-new-city-->
+            <option value="">-- Not set --</option>
+            <option value="Las Vegas">Las Vegas</option>
+            <option value="Salt Lake City">Salt Lake City</option>
+        </select>
         <label>Lead Source (how did they hear about us?):</label>
         <select name="lead_source_id">{lead_source_options}</select>
         <label>Service Type:</label>
@@ -3412,7 +3429,16 @@ def crm_edit(lead_id):
         return redirect('/crm')
 
     if request.method == 'POST':
-        cursor.execute('''UPDATE leads SET first_name=%s, last_name=%s, phone=%s, email=%s,
+        try:
+            cursor.execute('''UPDATE leads SET first_name=%s, last_name=%s, phone=%s, email=%s,
+                          address=%s, service_type=%s, status=%s, notes=%s, lead_source_id=%s, city=%s WHERE id=%s''',
+                       (request.form['first_name'], request.form['last_name'],
+                        request.form.get('phone', ''), request.form.get('email', ''),
+                        request.form.get('address', ''), request.form.get('service_type', ''),
+                        request.form.get('status', 'new'), request.form.get('notes', ''),
+                        request.form.get('lead_source_id') or None, request.form.get('city', '') or None, lead_id))
+        except Exception:
+            cursor.execute('''UPDATE leads SET first_name=%s, last_name=%s, phone=%s, email=%s,
                           address=%s, service_type=%s, status=%s, notes=%s, lead_source_id=%s WHERE id=%s''',
                        (request.form['first_name'], request.form['last_name'],
                         request.form.get('phone', ''), request.form.get('email', ''),
@@ -3433,6 +3459,12 @@ def crm_edit(lead_id):
         sel = 'selected' if lead['status'] == val else ''
         status_options += f'<option value="{val}" {sel}>{label}</option>'
     lead_source_options = get_marketing_sources_options(lead.get('lead_source_id'))
+    _lc = (lead.get('city') or '')
+    _city_opts = ''
+    for _cv in ['', 'Las Vegas', 'Salt Lake City']:
+        _lbl = _cv if _cv else '-- Not set --'
+        _sel = 'selected' if _lc == _cv else ''
+        _city_opts += f'<option value="{_cv}" {_sel}>{_lbl}</option>'
 
     return STYLE + admin_nav() + f'''
     <h1>Edit Lead: {lead["first_name"]} {lead["last_name"]}</h1>
@@ -3447,6 +3479,8 @@ def crm_edit(lead_id):
         <input type="email" name="email" value="{lead['email'] or ''}">
         <label>Address:</label>
         <input type="text" name="address" value="{lead['address'] or ''}">
+        <label>City / Market:</label>
+        <select name="city">{_city_opts}</select>  <!--crm-edit-city-->
         <label>Lead Source:</label>
         <select name="lead_source_id">{lead_source_options}</select>
         <label>Service Type:</label>
