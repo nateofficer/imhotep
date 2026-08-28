@@ -1191,6 +1191,7 @@ def staff_list():
 
     html = STYLE + admin_nav()
     html += '<h1>Staff</h1>'
+    html += '<p><a class="btn btn-success" href="/employee/new">+ Add Employee</a></p>  <!--staff-add-->'
     html += '<p class="form-note">Showing Active and Scheduling crew members only. '
     html += '<a href="/applications">View all applicants &rarr;</a></p>'
 
@@ -1261,6 +1262,23 @@ def staff_list():
         </div>
         '''
     html += '</div>'
+    _ic = get_db(); _icur = _ic.cursor()
+    try:
+        _icur.execute("SELECT id, first_name, last_name FROM candidates WHERE status = 'Inactive' ORDER BY first_name")
+        _inactive = _icur.fetchall()
+    except Exception:
+        _inactive = []
+    _ic.close()
+    if _inactive:
+        html += '<h2 style="margin-top:24px;color:#7f8c8d;">Former / Inactive</h2>'
+        html += '<p class="form-note">Removed from active crew. All records kept. Reactivate to add them back.</p>'
+        for _e in _inactive:
+            html += ('<div style="border:1px solid #eee;border-radius:6px;padding:8px 12px;margin-bottom:6px;">'
+                     + _e["first_name"] + ' ' + _e["last_name"] + ' &nbsp; '
+                     '<a class="btn" href="/staff/' + str(_e["id"]) + '" style="font-size:12px;padding:3px 9px;">View</a> '
+                     '<form method="POST" action="/employee/' + str(_e["id"]) + '/reactivate" style="display:inline;background:none;box-shadow:none;padding:0;">'
+                     '<button type="submit" class="btn btn-success" style="font-size:12px;padding:3px 9px;">Reactivate</button></form>'
+                     '</div>')
     return html
 
 
@@ -1341,6 +1359,15 @@ def staff_detail(candidate_id):
     html += f'<p style="margin:2px 0 12px 0;"><span style="background:#27ae60;color:white;padding:2px 10px;border-radius:4px;font-size:13px;font-weight:bold;">{status}</span> '
     html += f'<span class="score-badge {score_class(score)}">App Score: {score}/100</span></p>'
     html += f'<p style="margin:8px 0;">{contact_btns}</p>'
+    html += "<script>function empDeact(){return confirm('Remove from active crew? Their records are kept.');}function empDel(){return confirm('PERMANENTLY delete this person and ALL their records (hours, pay)? This cannot be undone.');}</script>"
+    _isinactive = (str(status).lower() == 'inactive')
+    html += '<div style="margin:6px 0 14px;padding:8px 0;border-top:1px solid #eee;">'
+    if _isinactive:
+        html += f'<form method="POST" action="/employee/{candidate_id}/reactivate" style="display:inline;background:none;box-shadow:none;padding:0;"><button type="submit" class="btn btn-success" style="font-size:12px;">Reactivate Employee</button></form> '
+    else:
+        html += f'<form method="POST" action="/employee/{candidate_id}/deactivate" style="display:inline;background:none;box-shadow:none;padding:0;" onsubmit="return empDeact();"><button type="submit" class="btn" style="font-size:12px;background:#e67e22;">Remove from Crew</button></form> '
+    html += f'<form method="POST" action="/employee/{candidate_id}/delete" style="display:inline;background:none;box-shadow:none;padding:0;" onsubmit="return empDel();"><button type="submit" class="btn btn-danger" style="font-size:12px;">Delete Permanently</button></form>'
+    html += '</div>'
 
     html += '<div class="application" style="margin-top:12px;"><h2>Application</h2>'
     html += f'<p><strong>Position:</strong> {c.get("job_title") or "N/A"}</p>'
@@ -4152,6 +4179,113 @@ def job_status_badge(status):
     return f'<span style="background:{color};color:white;padding:3px 10px;border-radius:4px;font-size:12px;font-weight:bold;">{label}</span>'
 
 
+@app.route('/employee/new', methods=['GET', 'POST'])
+@login_required
+def employee_new():
+    conn = get_db(); cursor = conn.cursor()
+    for _col, _ddl in (("pay_rate", "ALTER TABLE candidates ADD COLUMN pay_rate DECIMAL(6,2)"),
+                       ("work_state", "ALTER TABLE candidates ADD COLUMN work_state VARCHAR(2)")):
+        try:
+            cursor.execute("SELECT " + _col + " FROM candidates LIMIT 1")
+        except Exception:
+            try:
+                cursor.execute(_ddl)
+            except Exception:
+                pass
+    conn.commit()
+    if request.method == 'POST':
+        fn = (request.form.get('first_name') or '').strip()
+        ln = (request.form.get('last_name') or '').strip()
+        em = (request.form.get('email') or '').strip()
+        ph = (request.form.get('phone') or '').strip()
+        st = ((request.form.get('work_state') or 'NV').strip().upper()[:2]) or 'NV'
+        rate = (request.form.get('pay_rate') or '').strip()
+        if fn and ln and em:
+            cursor.execute(
+                "INSERT INTO candidates (first_name, last_name, email, phone, status, hired, applied_date, pay_rate, work_state) VALUES (%s,%s,%s,%s,'Active',1,NOW(),%s,%s)",
+                (fn, ln, em, ph, float(rate) if rate else None, st))
+            cid = cursor.lastrowid
+            while True:
+                code = generate_access_code()
+                cursor.execute('SELECT 1 FROM trainees WHERE access_code = %s', (code,))
+                if not cursor.fetchone():
+                    break
+            cursor.execute('INSERT INTO trainees (candidate_id, email, access_code) VALUES (%s,%s,%s)',
+                           (cid, em, code))
+            conn.commit(); conn.close()
+            return redirect('/staff/' + str(cid))
+        conn.close()
+        return redirect('/employee/new')
+    conn.close()
+    html = STYLE + admin_nav() + '<h1>Add Employee</h1>'
+    html += '<p class="form-note">Adds someone directly as active crew, for a hire who did not apply online. They appear on Staff, Availability, and Payroll right away.</p>'
+    html += '<form method="POST" action="/employee/new" style="max-width:420px;">'
+    html += '<p><label>First name *<br><input name="first_name" required style="width:100%;padding:8px;"></label></p>'
+    html += '<p><label>Last name *<br><input name="last_name" required style="width:100%;padding:8px;"></label></p>'
+    html += '<p><label>Email *<br><input type="email" name="email" required style="width:100%;padding:8px;"></label></p>'
+    html += '<p><label>Phone<br><input name="phone" style="width:100%;padding:8px;"></label></p>'
+    html += '<p><label>Work state<br><select name="work_state" style="padding:8px;"><option value="NV">NV (Las Vegas)</option><option value="UT">UT (Salt Lake)</option></select></label></p>'
+    html += '<p><label>Hourly pay rate<br>$<input type="number" step="0.01" min="0" name="pay_rate" style="width:120px;padding:8px;"></label></p>'
+    html += '<button class="btn btn-success" type="submit">Add Employee</button> <a class="btn" href="/staff" style="background:#95a5a6;">Cancel</a>'
+    html += '</form>'
+    return html
+
+
+@app.route('/employee/<int:candidate_id>/deactivate', methods=['POST'])
+@login_required
+def employee_deactivate(candidate_id):
+    conn = get_db(); cursor = conn.cursor()
+    try:
+        cursor.execute("UPDATE candidates SET status='Inactive' WHERE id=%s", (candidate_id,))
+        conn.commit()
+    except Exception:
+        pass
+    conn.close()
+    return redirect('/staff')
+
+
+@app.route('/employee/<int:candidate_id>/reactivate', methods=['POST'])
+@login_required
+def employee_reactivate(candidate_id):
+    conn = get_db(); cursor = conn.cursor()
+    try:
+        cursor.execute("UPDATE candidates SET status='Active' WHERE id=%s", (candidate_id,))
+        conn.commit()
+    except Exception:
+        pass
+    conn.close()
+    return redirect('/staff/' + str(candidate_id))
+
+
+@app.route('/employee/<int:candidate_id>/delete', methods=['POST'])
+@login_required
+def employee_delete(candidate_id):
+    conn = get_db(); cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT id FROM trainees WHERE candidate_id=%s", (candidate_id,))
+        _trows = cursor.fetchall()
+    except Exception:
+        _trows = []
+    for _t in _trows:
+        for _sql in ("DELETE FROM module_progress WHERE trainee_id=%s",
+                     "DELETE FROM trainee_documents WHERE trainee_id=%s"):
+            try:
+                cursor.execute(_sql, (_t["id"],))
+            except Exception:
+                pass
+    for _sql in ("DELETE FROM time_punches WHERE candidate_id=%s",
+                 "DELETE FROM staff_availability WHERE candidate_id=%s",
+                 "DELETE FROM phone_interviews WHERE candidate_id=%s",
+                 "DELETE FROM trainees WHERE candidate_id=%s",
+                 "DELETE FROM candidates WHERE id=%s"):
+        try:
+            cursor.execute(_sql, (candidate_id,))
+        except Exception:
+            pass
+    conn.commit(); conn.close()
+    return redirect('/staff')
+
+
 def get_crew_roster():
     """Real crew roster -- people who've actually been hired and trained,
     not candidates.status (which is set manually and not kept current)."""
@@ -4161,6 +4295,7 @@ def get_crew_roster():
         SELECT candidates.id, candidates.first_name, candidates.last_name
         FROM trainees
         JOIN candidates ON trainees.candidate_id = candidates.id
+        WHERE (candidates.status IS NULL OR candidates.status <> 'Inactive')
         ORDER BY candidates.first_name
     ''')
     roster = cursor.fetchall()
