@@ -4316,7 +4316,7 @@ def schedule_list():
         crew_by_job.setdefault(row['cleaning_job_id'], []).append(row)
 
     html = STYLE + admin_nav() + '<h1>Scheduling</h1>'
-    html += '<p><a class="btn btn-success" href="/schedule/new">+ Schedule a Job</a> <a class="btn" href="/schedule/calendar" style="background:#8e44ad;">&#128197; Calendar</a> <a class="btn" href="/schedule/timesheets" style="background:#5C3D2E;">Timesheets</a></p>'
+    html += '<p><a class="btn btn-success" href="/schedule/new">+ Schedule a Job</a> <a class="btn" href="/schedule/calendar" style="background:#8e44ad;">&#128197; Calendar</a> <a class="btn" href="/schedule/availability" style="background:#16a085;">&#128337; Availability</a> <a class="btn" href="/schedule/timesheets" style="background:#5C3D2E;">Timesheets</a></p>'
 
     if not jobs:
         html += '<div class="info"><p>No jobs scheduled yet. You\'ll need at least one customer first -- see <a href="/customers">Customers</a>.</p></div>'
@@ -4713,6 +4713,150 @@ def schedule_calendar():
         html += "<span style='background:" + color + ";color:white;padding:3px 10px;border-radius:4px;font-size:12px;font-weight:bold;'>" + lbl + "</span>"
     html += "</div>"
     return html
+
+
+AVAIL_COLORS = ['#2980b9', '#c0392b', '#27ae60', '#8e44ad', '#e67e22', '#16a085', '#d35400', '#2c3e50']
+
+
+def _fmt_time(t):
+    try:
+        parts = str(t).split(':')
+        h = int(parts[0]); m = int(parts[1])
+        ap = 'AM' if h < 12 else 'PM'
+        h12 = h % 12
+        if h12 == 0:
+            h12 = 12
+        return "%d:%02d %s" % (h12, m, ap)
+    except Exception:
+        return str(t)
+
+
+@app.route('/schedule/availability', methods=['GET', 'POST'])
+@login_required
+def schedule_availability():
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS staff_availability (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            candidate_id INT NOT NULL,
+            day_of_week INT NOT NULL,
+            start_time VARCHAR(5) NOT NULL,
+            end_time VARCHAR(5) NOT NULL,
+            created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+
+    if request.method == 'POST':
+        cid = request.form.get('candidate_id', '')
+        days = request.form.getlist('day_of_week')
+        st = request.form.get('start_time', '')
+        et = request.form.get('end_time', '')
+        if cid and days and st and et and et > st:
+            for d in days:
+                try:
+                    cursor.execute(
+                        "INSERT INTO staff_availability (candidate_id, day_of_week, start_time, end_time) VALUES (%s,%s,%s,%s)",
+                        (int(cid), int(d), st, et))
+                except Exception:
+                    pass
+            conn.commit()
+        conn.close()
+        return redirect('/schedule/availability')
+
+    roster = get_crew_roster()
+    color_of = {}
+    for i, r in enumerate(roster):
+        color_of[r["id"]] = AVAIL_COLORS[i % len(AVAIL_COLORS)]
+
+    cursor.execute("""
+        SELECT staff_availability.*, candidates.first_name, candidates.last_name
+        FROM staff_availability
+        JOIN candidates ON staff_availability.candidate_id = candidates.id
+        ORDER BY staff_availability.day_of_week, staff_availability.start_time
+    """)
+    avail = cursor.fetchall()
+    conn.close()
+
+    day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    by_day = {i: [] for i in range(7)}
+    for a in avail:
+        by_day[int(a["day_of_week"])].append(a)
+
+    html = STYLE + admin_nav() + '<h1>Staff Availability</h1>'
+    html += "<script>function delAvail(){return confirm('Remove this availability?');}</script>"
+    html += ('<div style="margin:10px 0 18px;padding:14px;background:#f4f6f8;border-radius:8px;">'
+             '<p style="margin:0 0 8px;font-weight:600;">What do you want to do?</p>'
+             '<a class="btn" href="#addform" style="background:#16a085;">&#128337; Add Employee Availability</a> '
+             '<a class="btn btn-success" href="/schedule/new">+ Schedule a Job</a> '
+             '<a class="btn" href="/schedule/calendar" style="background:#8e44ad;">&#128197; Jobs Calendar</a>'
+             '</div>')
+
+    if roster:
+        html += '<p style="margin:6px 0 12px;">'
+        for r in roster:
+            html += ('<span style="display:inline-block;margin-right:12px;font-size:13px;">'
+                     '<span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:'
+                     + color_of[r["id"]] + ';vertical-align:middle;margin-right:5px;"></span>'
+                     + r["first_name"] + ' ' + r["last_name"] + '</span>')
+        html += '</p>'
+
+    html += '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;min-width:760px;">'
+    html += '<tr>'
+    for dn in day_names:
+        html += '<th style="border:1px solid #ddd;padding:6px;background:#2c3e50;color:#fff;font-size:13px;width:14.2%;">' + dn + '</th>'
+    html += '</tr><tr style="vertical-align:top;">'
+    for i in range(7):
+        html += '<td style="border:1px solid #ddd;padding:6px;height:130px;">'
+        if by_day[i]:
+            for a in by_day[i]:
+                _c = color_of.get(a["candidate_id"], '#7f8c8d')
+                html += (f'<div style="background:{_c};color:#fff;border-radius:5px;padding:4px 6px;margin-bottom:5px;font-size:12px;">'
+                         f'<strong>{a["first_name"]}</strong><br>{_fmt_time(a["start_time"])}&ndash;{_fmt_time(a["end_time"])} '
+                         f'<form method="POST" action="/schedule/availability/{a["id"]}/delete" style="display:inline;padding:0;background:none;box-shadow:none;" onsubmit="return delAvail();">'
+                         f'<button type="submit" style="background:none;border:none;color:#fff;cursor:pointer;font-size:13px;padding:0;margin-left:4px;">&times;</button>'
+                         f'</form></div>')
+        else:
+            html += '<span style="color:#bbb;font-size:12px;">&mdash;</span>'
+        html += '</td>'
+    html += '</tr></table></div>'
+
+    html += '<div class="application" id="addform" style="margin-top:18px;"><h2>Add Employee Availability</h2>'
+    if not roster:
+        html += '<p style="color:#999;">No trained crew yet. Hire and train someone first, and they will show up here.</p>'
+    else:
+        html += '<form method="POST" action="/schedule/availability">'
+        html += '<p><strong>Employee:</strong><br><select name="candidate_id" required style="padding:8px;border-radius:5px;border:1px solid #ccc;min-width:220px;">'
+        for r in roster:
+            html += '<option value="' + str(r["id"]) + '">' + r["first_name"] + ' ' + r["last_name"] + '</option>'
+        html += '</select></p>'
+        html += '<p><strong>Day(s):</strong><br>'
+        for i, dn in enumerate(day_names):
+            html += ('<label style="display:inline-block;margin-right:12px;font-weight:normal;">'
+                     '<input type="checkbox" name="day_of_week" value="' + str(i) + '"> ' + dn[:3] + '</label>')
+        html += '</p>'
+        html += ('<p><strong>Time:</strong><br>'
+                 '<label>From <input type="time" name="start_time" required></label> &nbsp; '
+                 '<label>To <input type="time" name="end_time" required></label></p>')
+        html += '<button class="btn btn-success" type="submit">Save Availability</button>'
+        html += '</form>'
+    html += '</div>'
+    return html
+
+
+@app.route('/schedule/availability/<int:av_id>/delete', methods=['POST'])
+@login_required
+def schedule_availability_delete(av_id):
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM staff_availability WHERE id = %s", (av_id,))
+        conn.commit()
+    except Exception:
+        pass
+    conn.close()
+    return redirect('/schedule/availability')
 
 
 @app.route('/schedule/timesheets')
