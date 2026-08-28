@@ -3686,6 +3686,7 @@ def quote_price():
 
     full_notes = "[Quote] %s | %s | Beds: %s | Baths: %s | SqFt: %s | Estimate: $%s" % (
         type_label, freq_label, bedrooms, bathrooms, sqft, price)
+    full_notes += " | Offer: $25 off first clean"
     if address:
         full_notes += " | Address: " + address
     if city:
@@ -3903,14 +3904,15 @@ def render_quote_page(source):
   </div>
 
   <div class="card" id="rangecard">
-    <p class="sub" style="text-align:center;margin:0 0 6px;">Your estimated price</p>
+    <p class="sub" style="text-align:center;margin:0 0 6px;">Ballpark range for a home like yours</p>
     <div class="range" id="range">$210 &ndash; $250</div>
-    <p class="note" id="rangenote">Estimate updates as you adjust your home above.</p>
+    <p class="note" id="rangenote">Enter your info below to lock in your <strong>exact price</strong> &mdash; and take $25 off your first clean.</p>
   </div>
 
   <div class="card" id="gate">
-    <h2>Like your estimate? Lock it in.</h2>
-    <p class="sub">Enter your info and we&rsquo;ll lock in this estimate and reach out to schedule your clean. No cost, no obligation.</p>
+    <h2>See your exact price &mdash; and save $25</h2>
+    <div style="background:#e8f8f0;border:1px solid #27ae60;border-radius:8px;padding:10px 12px;margin:0 0 12px;text-align:center;color:#1e8449;font-weight:600;">&#127881; $25 off your first clean when you lock in today</div>
+    <p class="sub">Enter your info to reveal your exact price and claim your discount. No cost, no obligation.</p>
     <div class="fld"><label>Which area? *</label>
       <select id="city" style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px;font-size:16px;">
         <option value="Las Vegas">Las Vegas</option>
@@ -3925,13 +3927,13 @@ def render_quote_page(source):
     <div class="fld hidden"><label>Last name</label><input id="ln"></div>
     <div class="fld"><label>Phone (optional)</label><input id="ph" type="tel"></div>
     <div class="fld"><label>Address (optional)</label><input id="ad"></div>
-    <button class="btn" id="go">Lock In My Price</button>
+    <button class="btn" id="go">Get My Exact Price &amp; $25 Off</button>
     <div class="err" id="err"></div>
     <p class="note">No obligation. We'll never share your information.</p>
   </div>
 
   <div class="card hidden" id="result">
-    <div class="price hidden">
+    <div class="price">
       <div class="amt" id="amt">$0</div>
       <div class="lbl" id="lbl"></div>
     </div>
@@ -3980,8 +3982,8 @@ function estimate(){
     p = p * (FREQ_MULT[state.freq] || 1);
   }
   if(p < 150) p = 150;
-  var lo = Math.floor((p * 0.92) / 5) * 5;
-  var hi = Math.ceil((p * 1.09) / 5) * 5;
+  var lo = Math.floor((p * 0.80) / 5) * 5;
+  var hi = Math.ceil((p * 1.22) / 5) * 5;
   document.getElementById('range').innerHTML = '$' + lo + ' &ndash; $' + hi;
 }
 
@@ -4044,6 +4046,8 @@ document.getElementById('go').addEventListener('click', function(){
       var lbl = j.type_label;
       if(state.type === 'standard' || state.type === 'airbnb'){ lbl += ' \u00b7 ' + j.freq_label; }
       document.getElementById('lbl').textContent = lbl;
+      var _disc = Math.max(0, j.price - 25);
+      document.getElementById('amt').innerHTML = '$' + j.price + ' <span style="font-size:15px;color:#27ae60;">&rarr; $' + _disc + ' with $25 off your first clean</span>';
       document.getElementById('thanks').textContent =
         'Thanks ' + j.name + '! Your free quote is on its way to your inbox. We\\'ll confirm the final price after a quick walkthrough, so you only pay for what your home actually needs.';
       res.scrollIntoView({behavior:'smooth'});
