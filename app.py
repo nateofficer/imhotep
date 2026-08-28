@@ -4194,6 +4194,28 @@ def employee_new():
                 pass
     conn.commit()
     if request.method == 'POST':
+        from_id = (request.form.get('from_candidate_id') or '').strip()
+        if from_id:
+            st2 = ((request.form.get('work_state') or 'NV').strip().upper()[:2]) or 'NV'
+            rate2 = (request.form.get('pay_rate') or '').strip()
+            cursor.execute("SELECT id FROM trainees WHERE candidate_id=%s", (from_id,))
+            if cursor.fetchone():
+                conn.close()
+                return redirect('/staff/' + str(from_id))
+            cursor.execute("SELECT email FROM candidates WHERE id=%s", (from_id,))
+            _cr = cursor.fetchone()
+            _em = (_cr["email"] if (_cr and _cr.get("email")) else ("emp" + str(from_id) + "@caseyscleaning.net"))
+            while True:
+                code = generate_access_code()
+                cursor.execute('SELECT 1 FROM trainees WHERE access_code = %s', (code,))
+                if not cursor.fetchone():
+                    break
+            cursor.execute('INSERT INTO trainees (candidate_id, email, access_code) VALUES (%s,%s,%s)',
+                           (from_id, _em, code))
+            cursor.execute("UPDATE candidates SET status='Active', hired=1, pay_rate=%s, work_state=%s WHERE id=%s",
+                           (float(rate2) if rate2 else None, st2, from_id))
+            conn.commit(); conn.close()
+            return redirect('/staff/' + str(from_id))
         fn = (request.form.get('first_name') or '').strip()
         ln = (request.form.get('last_name') or '').strip()
         em = (request.form.get('email') or '').strip()
@@ -4216,8 +4238,30 @@ def employee_new():
             return redirect('/staff/' + str(cid))
         conn.close()
         return redirect('/employee/new')
+    cursor.execute("""
+        SELECT candidates.id AS id, candidates.first_name AS fn, candidates.last_name AS ln, candidates.status AS status
+        FROM candidates
+        LEFT JOIN trainees ON trainees.candidate_id = candidates.id
+        WHERE trainees.id IS NULL
+        ORDER BY candidates.first_name
+    """)
+    applicants = cursor.fetchall()
     conn.close()
     html = STYLE + admin_nav() + '<h1>Add Employee</h1>'
+    if applicants:
+        html += '<div class="application" style="max-width:460px;"><h2>Add from an applicant</h2>'
+        html += '<p class="form-note">Promote someone who already applied &mdash; their info is on file, just set pay.</p>'
+        html += '<form method="POST" action="/employee/new">'
+        html += '<p><label>Applicant<br><select name="from_candidate_id" required style="width:100%;padding:8px;">'
+        for _a in applicants:
+            _stat = (" (" + str(_a["status"]) + ")") if _a.get("status") else ""
+            html += '<option value="' + str(_a["id"]) + '">' + str(_a["fn"]) + ' ' + str(_a["ln"]) + _stat + '</option>'
+        html += '</select></label></p>'
+        html += '<p><label>Work state<br><select name="work_state" style="padding:8px;"><option value="NV">NV (Las Vegas)</option><option value="UT">UT (Salt Lake)</option></select></label></p>'
+        html += '<p><label>Hourly pay rate<br>$<input type="number" step="0.01" min="0" name="pay_rate" style="width:120px;padding:8px;"></label></p>'
+        html += '<button class="btn btn-success" type="submit">Add to Crew</button>'
+        html += '</form></div>'
+        html += '<h2 style="margin-top:22px;">Or add someone new</h2>'
     html += '<p class="form-note">Adds someone directly as active crew, for a hire who did not apply online. They appear on Staff, Availability, and Payroll right away.</p>'
     html += '<form method="POST" action="/employee/new" style="max-width:420px;">'
     html += '<p><label>First name *<br><input name="first_name" required style="width:100%;padding:8px;"></label></p>'
