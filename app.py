@@ -5946,6 +5946,32 @@ for _sc, _ss in _SHORT_SOURCES.items():
         app.add_url_rule('/' + _sc, 'shortlink_' + _sc, _short_link_redirect)
 # --- end short ad links ---
 
+# --- city + source short ad links (auto-generated) ---
+_SHORT_CITY_SOURCES = {
+    'lv-fb':   ('lv',  'facebook'),
+    'slc-fb':  ('slc', 'facebook'),
+    'lv-fbg':  ('lv',  'fbgroup'),
+    'slc-fbg': ('slc', 'fbgroup'),
+    'lv-nd':   ('lv',  'nextdoor'),
+    'slc-nd':  ('slc', 'nextdoor'),
+    'lv-gg':   ('lv',  'google'),
+    'slc-gg':  ('slc', 'google'),
+}
+
+def _short_city_link_redirect():
+    from flask import request as _rq, redirect as _rd
+    _code = _rq.path.strip('/').lower()
+    _pair = _SHORT_CITY_SOURCES.get(_code)
+    if not _pair:
+        return _rd('/quote', code=302)
+    _city, _src = _pair
+    return _rd('/quote?city=' + _city + '&utm_source=' + _src, code=302)
+
+for _sc2 in _SHORT_CITY_SOURCES:
+    if not any(_r.rule == '/' + _sc2 for _r in app.url_map.iter_rules()):
+        app.add_url_rule('/' + _sc2, 'citylink_' + _sc2.replace('-', '_'), _short_city_link_redirect)
+# --- end city + source short ad links ---
+
 # ---------------------------------------------------------------------------
 # RND_MODULE_V1 -- Research & Development  (RND_PYRAMID_V1 applied)  (RND_DICTFIX_V1 applied)
 # Small problems take the decision path, large ones take the research path.
