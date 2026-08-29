@@ -5253,8 +5253,14 @@ def payroll():
              '<td style="padding:8px;text-align:right;">' + ("%.2f" % tot_dt) + '</td>'
              '<td style="padding:8px;text-align:right;">$' + ("%.2f" % tot_gross) + '</td></tr>')
     html += '</table>'
+    html += "<script>function prSave(){return confirm('Save this pay period as a permanent record?');}</script>"
     html += ('<p><a class="btn" href="/payroll/export?start=' + start.isoformat() + '&end=' + end.isoformat()
-             + '" style="background:#16a085;">&#128190; Download CSV</a></p>')
+             + '" style="background:#16a085;">&#128190; Download CSV</a> '
+             '<form method="POST" action="/payroll/save" style="display:inline;background:none;box-shadow:none;padding:0;" onsubmit="return prSave();">'
+             '<input type="hidden" name="start" value="' + start.isoformat() + '">'
+             '<input type="hidden" name="end" value="' + end.isoformat() + '">'
+             '<button type="submit" class="btn btn-success">&#128190; Save This Run</button></form> '
+             '<a class="btn" href="/payroll/history" style="background:#34495e;">&#128203; Run History</a></p>')
 
     html += '<div class="application" style="margin-top:18px;"><h2>Pay Rates</h2>'
     html += '<p style="color:#666;font-size:13px;">Set the hourly rate and work state for each person. Vegas = NV (daily overtime past 8 hrs), Salt Lake = UT (weekly overtime past 40 only).</p>'
@@ -5305,6 +5311,110 @@ def payroll_export():
     fname = "payroll_" + start.isoformat() + "_to_" + end.isoformat() + ".csv"
     return (out.getvalue(), 200, {"Content-Type": "text/csv",
             "Content-Disposition": 'attachment; filename="' + fname + '"'})
+
+
+@app.route('/payroll/save', methods=['POST'])
+@login_required
+def payroll_save():
+    import datetime as _dt
+    start, end = _payroll_period(request.form)
+    conn = get_db(); cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS payroll_runs (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            batch_id VARCHAR(30),
+            period_start DATE, period_end DATE,
+            candidate_id INT, employee_name VARCHAR(200), work_state VARCHAR(2),
+            pay_rate DECIMAL(6,2), reg_hours DECIMAL(7,2), ot_hours DECIMAL(7,2),
+            dt_hours DECIMAL(7,2), gross_pay DECIMAL(9,2),
+            saved_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+    batch = _dt.datetime.now().strftime('%Y%m%d%H%M%S')
+    for r in _payroll_roster():
+        cursor.execute(
+            "SELECT clock_in, clock_out FROM time_punches WHERE candidate_id=%s AND clock_out IS NOT NULL AND DATE(clock_in) BETWEEN %s AND %s",
+            (r["id"], start, end))
+        punches = [(p["clock_in"], p["clock_out"]) for p in cursor.fetchall()]
+        st = (r["work_state"] or "NV")
+        reg, ot, dtt, gross = _payroll_compute(punches, st, r["pay_rate"])
+        if reg == 0 and ot == 0 and dtt == 0 and gross == 0:
+            continue
+        cursor.execute(
+            "INSERT INTO payroll_runs (batch_id, period_start, period_end, candidate_id, employee_name, work_state, pay_rate, reg_hours, ot_hours, dt_hours, gross_pay) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+            (batch, start, end, r["id"], (r["first_name"] + " " + r["last_name"]), st,
+             r["pay_rate"], reg, ot, dtt, gross))
+    conn.commit(); conn.close()
+    return redirect('/payroll/history')
+
+
+@app.route('/payroll/history')
+@login_required
+def payroll_history():
+    conn = get_db(); cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS payroll_runs (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            batch_id VARCHAR(30),
+            period_start DATE, period_end DATE,
+            candidate_id INT, employee_name VARCHAR(200), work_state VARCHAR(2),
+            pay_rate DECIMAL(6,2), reg_hours DECIMAL(7,2), ot_hours DECIMAL(7,2),
+            dt_hours DECIMAL(7,2), gross_pay DECIMAL(9,2),
+            saved_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+    cursor.execute("SELECT * FROM payroll_runs ORDER BY saved_date DESC, id DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    from collections import OrderedDict
+    batches = OrderedDict()
+    for r in rows:
+        batches.setdefault(r["batch_id"], []).append(r)
+    html = STYLE + admin_nav() + '<h1>Payroll History</h1>'
+    html += "<script>function delRun(){return confirm('Delete this saved run? The record will be gone.');}</script>"
+    html += '<p><a class="btn" href="/payroll" style="background:#7f8c8d;">&larr; Back to Payroll</a></p>'
+    if not batches:
+        html += '<p style="color:#999;">No saved runs yet. On the Payroll page, pick a period and click "Save This Run."</p>'
+        return html
+    for bid in batches:
+        lines = batches[bid]
+        period = str(lines[0]["period_start"]) + " to " + str(lines[0]["period_end"])
+        saved = str(lines[0]["saved_date"])[:16]
+        total = sum(float(x["gross_pay"] or 0) for x in lines)
+        html += '<div class="application" style="margin-bottom:14px;">'
+        html += '<h2 style="margin:0 0 4px;">Pay period: ' + period + '</h2>'
+        html += '<p class="form-note" style="margin:0 0 8px;">Saved ' + saved + ' &middot; ' + str(len(lines)) + ' paid &middot; total <strong>$' + ('%.2f' % total) + '</strong></p>'
+        html += '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
+        html += '<tr style="background:#ecf0f1;"><th style="padding:6px;text-align:left;">Employee</th><th>St</th><th>Rate</th><th>Reg</th><th>OT</th><th>DT</th><th>Gross</th></tr>'
+        for x in lines:
+            rate = ('$%.2f' % float(x["pay_rate"])) if x["pay_rate"] is not None else '-'
+            html += ('<tr style="border-bottom:1px solid #eee;"><td style="padding:6px;">' + str(x["employee_name"]) + '</td>'
+                     '<td style="text-align:center;">' + str(x["work_state"] or '') + '</td>'
+                     '<td style="text-align:right;">' + rate + '</td>'
+                     '<td style="text-align:right;">' + ('%.2f' % float(x["reg_hours"] or 0)) + '</td>'
+                     '<td style="text-align:right;">' + ('%.2f' % float(x["ot_hours"] or 0)) + '</td>'
+                     '<td style="text-align:right;">' + ('%.2f' % float(x["dt_hours"] or 0)) + '</td>'
+                     '<td style="text-align:right;font-weight:bold;">$' + ('%.2f' % float(x["gross_pay"] or 0)) + '</td></tr>')
+        html += '</table>'
+        html += ('<form method="POST" action="/payroll/history/' + str(bid) + '/delete" style="display:inline;background:none;box-shadow:none;padding:0;" onsubmit="return delRun();">'
+                 '<button type="submit" class="btn" style="font-size:12px;background:#c0392b;margin-top:8px;">Delete this run</button></form>')
+        html += '</div>'
+    return html
+
+
+@app.route('/payroll/history/<batch_id>/delete', methods=['POST'])
+@login_required
+def payroll_history_delete(batch_id):
+    conn = get_db(); cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM payroll_runs WHERE batch_id=%s", (batch_id,))
+        conn.commit()
+    except Exception:
+        pass
+    conn.close()
+    return redirect('/payroll/history')
 
 
 @app.route('/schedule/timesheets')
