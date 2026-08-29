@@ -1427,6 +1427,49 @@ def staff_detail(candidate_id):
         html += f'<p style="margin-top:8px;"><a class="btn" href="/trainee/{tr["id"]}" style="font-size:13px;">Full Training Record</a></p>'
     html += '</div>'
 
+    # --- payments / proof of payment ---
+    _pc = get_db(); _pcur = _pc.cursor()
+    _pcur.execute("""
+        CREATE TABLE IF NOT EXISTS payroll_payments (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            candidate_id INT,
+            period_start DATE, period_end DATE,
+            amount_paid DECIMAL(9,2), pay_date DATE,
+            method VARCHAR(40), proof_url VARCHAR(500), notes VARCHAR(500),
+            created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    _pc.commit()
+    _pcur.execute("SELECT * FROM payroll_payments WHERE candidate_id=%s ORDER BY pay_date DESC, id DESC", (candidate_id,))
+    _pays = _pcur.fetchall()
+    _pc.close()
+    html += '<div class="application" style="margin-top:12px;"><h2>Payments &amp; Proof</h2>'
+    if _pays:
+        html += '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:10px;">'
+        html += '<tr style="background:#ecf0f1;"><th style="padding:6px;text-align:left;">Date</th><th>Amount</th><th>Method</th><th>Period</th><th>Proof</th></tr>'
+        for _p in _pays:
+            _amt = ('$%.2f' % float(_p["amount_paid"])) if _p.get("amount_paid") is not None else '-'
+            _per = (str(_p["period_start"]) + ' to ' + str(_p["period_end"])) if _p.get("period_start") else '-'
+            _proof = ('<a href="' + str(_p["proof_url"]) + '" target="_blank">View</a>') if _p.get("proof_url") else '<span style="color:#bbb;">none</span>'
+            html += ('<tr style="border-bottom:1px solid #eee;"><td style="padding:6px;">' + str(_p.get("pay_date") or '-') + '</td>'
+                     '<td style="text-align:right;">' + _amt + '</td>'
+                     '<td style="text-align:center;">' + str(_p.get("method") or '-') + '</td>'
+                     '<td style="font-size:11px;">' + _per + '</td>'
+                     '<td style="text-align:center;">' + _proof + '</td></tr>')
+        html += '</table>'
+    else:
+        html += '<p style="color:#999;">No payments logged yet.</p>'
+    html += '<h3 style="margin:8px 0 4px;">Log a payment</h3>'
+    html += '<form method="POST" action="/employee/' + str(candidate_id) + '/payment" enctype="multipart/form-data" style="max-width:460px;">'
+    html += '<p><label>Amount paid $<input type="number" step="0.01" min="0" name="amount_paid" required style="width:110px;padding:6px;"></label> &nbsp; '
+    html += '<label>Date <input type="date" name="pay_date" required style="padding:6px;"></label></p>'
+    html += '<p><label>Method <select name="method" style="padding:6px;"><option>Check</option><option>Zelle</option><option>Venmo</option><option>Cash</option><option>Direct deposit</option><option>Other</option></select></label></p>'
+    html += '<p><label>Pay period (optional): <input type="date" name="period_start" style="padding:6px;"> to <input type="date" name="period_end" style="padding:6px;"></label></p>'
+    html += '<p><label>Proof (check photo, screenshot, or PDF):<br><input type="file" name="proof" accept="image/*,application/pdf"></label></p>'
+    html += '<p><label>Notes:<br><input type="text" name="notes" style="width:100%;padding:6px;"></label></p>'
+    html += '<button class="btn btn-success" type="submit">Save Payment</button>'
+    html += '</form></div>'
+
     return html
 
 
@@ -4366,6 +4409,47 @@ def employee_delete(candidate_id):
             pass
     conn.commit(); conn.close()
     return redirect('/staff')
+
+
+@app.route('/employee/<int:candidate_id>/payment', methods=['POST'])
+@login_required
+def employee_payment(candidate_id):
+    conn = get_db(); cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS payroll_payments (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            candidate_id INT,
+            period_start DATE, period_end DATE,
+            amount_paid DECIMAL(9,2), pay_date DATE,
+            method VARCHAR(40), proof_url VARCHAR(500), notes VARCHAR(500),
+            created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+    amount = (request.form.get('amount_paid') or '').strip()
+    pay_date = (request.form.get('pay_date') or '').strip() or None
+    method = (request.form.get('method') or '').strip()[:40]
+    ps = (request.form.get('period_start') or '').strip() or None
+    pe = (request.form.get('period_end') or '').strip() or None
+    notes = (request.form.get('notes') or '').strip()[:500]
+    proof_url = None
+    if 'proof' in request.files:
+        pf = request.files['proof']
+        if pf and pf.filename:
+            try:
+                _up = cloudinary.uploader.upload(pf, resource_type="auto", folder="payment_proofs")
+                proof_url = _up.get('secure_url')
+            except Exception:
+                proof_url = None
+    try:
+        cursor.execute(
+            "INSERT INTO payroll_payments (candidate_id, period_start, period_end, amount_paid, pay_date, method, proof_url, notes) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+            (candidate_id, ps, pe, float(amount) if amount else None, pay_date, method, proof_url, notes))
+        conn.commit()
+    except Exception:
+        pass
+    conn.close()
+    return redirect('/staff/' + str(candidate_id))
 
 
 def get_crew_roster():
