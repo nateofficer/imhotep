@@ -1551,6 +1551,20 @@ def staff_evaluate():
                 hrs7[r["cid"]] += h
     except Exception:
         pass
+    docs_signed = defaultdict(int); docs_total = defaultdict(int); bg_ok = {}
+    try:
+        cursor.execute("SELECT td.trainee_id AS tid, td.status AS status, d.title AS title FROM trainee_documents td JOIN documents d ON d.id = td.document_id")
+        for r in cursor.fetchall():
+            _t = r.get("tid")
+            if _t is None:
+                continue
+            docs_total[_t] += 1
+            if (r.get("status") or "") in ("signed", "verified"):
+                docs_signed[_t] += 1
+                if "background" in (r.get("title") or "").lower():
+                    bg_ok[_t] = True
+    except Exception:
+        pass
     conn.close()
 
     rows = []
@@ -1577,6 +1591,7 @@ def staff_evaluate():
             "status": c["status"] or "", "rp": rp, "cert": certified, "avg": avg,
             "iv": interview.get(cid), "app": c["app_score"],
             "h7": h7, "h30": h30, "last": last_in.get(cid),
+            "ds": docs_signed.get(tid, 0), "dt": docs_total.get(tid, 0), "bg": bg_ok.get(tid, False),
             "flag": flag, "fc": fc, "sort_flag": (0 if h7 > 0 else 1 if h30 > 0 else 2 if certified else 3 if rp > 0 else 4),
         })
     rows.sort(key=lambda r: (r["sort_flag"], -r["h30"], -r["rp"], r["name"].lower()))
@@ -1584,12 +1599,14 @@ def staff_evaluate():
     working = sum(1 for r in rows if r["h7"] > 0)
     certified_ct = sum(1 for r in rows if r["cert"])
     dead = sum(1 for r in rows if r["flag"] == "No activity")
+    bg_cleared = sum(1 for r in rows if r.get("bg"))
 
     html = STYLE + admin_nav() + '<h1>Crew Evaluation</h1>'
     html += '<p><a class="btn" href="/staff" style="background:#7f8c8d;">&larr; Back to Staff</a></p>'
     html += ('<p style="margin:6px 0 14px;">'
              '<span style="background:#eafaf1;border:1px solid #1e8449;color:#1e8449;padding:4px 12px;border-radius:14px;margin-right:8px;font-weight:600;">' + str(working) + ' worked this week</span>'
              '<span style="background:#eef5f9;border:1px solid #17a2b8;color:#127a8a;padding:4px 12px;border-radius:14px;margin-right:8px;font-weight:600;">' + str(certified_ct) + ' certified</span>'
+             '<span style="background:#eafaf1;border:1px solid #1e8449;color:#1e8449;padding:4px 12px;border-radius:14px;margin-right:8px;font-weight:600;">' + str(bg_cleared) + ' background cleared</span>'
              '<span style="background:#fdecea;border:1px solid #c0392b;color:#c0392b;padding:4px 12px;border-radius:14px;font-weight:600;">' + str(dead) + ' no activity</span>'
              ' &nbsp; <span style="color:#888;">' + str(len(rows)) + ' total on the roster</span></p>')
 
@@ -1607,6 +1624,7 @@ def staff_evaluate():
              '<th style="padding:7px;">Interview</th>'
              '<th style="padding:7px;">Hrs 7d</th>'
              '<th style="padding:7px;">Hrs 30d</th>'
+             '<th style="padding:7px;">Docs</th>'
              '<th style="padding:7px;">Last worked</th></tr>')
     for r in rows:
         cert_txt = ('<span style="color:#1e8449;font-weight:600;">Certified</span>' if r["cert"]
@@ -1614,6 +1632,12 @@ def staff_evaluate():
         avg_txt = (str(r["avg"]) + "%") if r["avg"] is not None else "&mdash;"
         iv_txt = (str(r["iv"]) + "/100") if r["iv"] is not None else "&mdash;"
         last_txt = str(r["last"])[:10] if r["last"] else '<span style="color:#c0392b;">never</span>'
+        if r["dt"]:
+            docs_txt = ('<span style="color:#1e8449;font-weight:600;">' if (r["ds"] >= r["dt"]) else '<span style="color:#e67e22;">') + str(r["ds"]) + '/' + str(r["dt"]) + '</span>'
+            if r["bg"]:
+                docs_txt += ' <span style="background:#1e8449;color:#fff;padding:1px 5px;border-radius:8px;font-size:10px;">BG</span>'
+        else:
+            docs_txt = '<span style="color:#bbb;">&mdash;</span>'
         h7c = "#1e8449" if r["h7"] > 0 else "#bbb"
         html += ('<tr style="border-bottom:1px solid #eee;">'
                  '<td style="padding:7px;"><a href="/staff/' + str(r["cid"]) + '">' + r["name"] + '</a></td>'
@@ -1624,6 +1648,7 @@ def staff_evaluate():
                  '<td style="padding:7px;text-align:center;">' + iv_txt + '</td>'
                  '<td style="padding:7px;text-align:right;color:' + h7c + ';font-weight:600;">' + ("%.1f" % r["h7"]) + '</td>'
                  '<td style="padding:7px;text-align:right;">' + ("%.1f" % r["h30"]) + '</td>'
+                 '<td style="padding:7px;text-align:center;font-size:12px;">' + docs_txt + '</td>'
                  '<td style="padding:7px;text-align:center;font-size:12px;">' + last_txt + '</td></tr>')
     html += '</table></div>'
     html += '<p class="form-note" style="margin-top:10px;">Sorted by who is actually working. &ldquo;No activity&rdquo; = has never clocked in and has no training progress &mdash; your first candidates to re-engage or cut.</p>'
