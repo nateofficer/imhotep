@@ -1191,7 +1191,7 @@ def staff_list():
 
     html = STYLE + admin_nav()
     html += '<h1>Staff</h1>'
-    html += '<p><a class="btn btn-success" href="/employee/new">+ Add Employee</a></p>  <!--staff-add-->'
+    html += '<p><a class="btn btn-success" href="/employee/new">+ Add Employee</a> <a class="btn" href="/staff/evaluate" style="background:#2c3e50;">&#128202; Evaluate Crew</a></p>  <!--staff-add-->'
     html += '<p class="form-note">Showing Active and Scheduling crew members only. '
     html += '<a href="/applications">View all applicants &rarr;</a></p>'
 
@@ -1470,6 +1470,163 @@ def staff_detail(candidate_id):
     html += '<button class="btn btn-success" type="submit">Save Payment</button>'
     html += '</form></div>'
 
+    return html
+
+
+@app.route('/staff/evaluate')
+@login_required
+def staff_evaluate():
+    import datetime as _dt
+    from collections import defaultdict
+    conn = get_db(); cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT trainees.id AS tid, candidates.id AS cid,
+               candidates.first_name AS fn, candidates.last_name AS ln,
+               candidates.status AS status, candidates.score AS app_score
+        FROM trainees JOIN candidates ON trainees.candidate_id = candidates.id
+        ORDER BY candidates.first_name
+    """)
+    crew = cursor.fetchall()
+
+    cursor.execute("SELECT id, required FROM training_modules")
+    tm = cursor.fetchall()
+    req_total = sum(1 for r in tm if r["required"])
+
+    try:
+        cursor.execute("""
+            SELECT mp.trainee_id AS tid, mp.passed AS passed, mp.attempts AS attempts,
+                   mp.score AS score, tmod.required AS required
+            FROM module_progress mp JOIN training_modules tmod ON tmod.id = mp.module_id
+        """)
+        mp_rows = cursor.fetchall()
+    except Exception:
+        cursor.execute("""
+            SELECT mp.trainee_id AS tid, mp.passed AS passed, mp.attempts AS attempts,
+                   tmod.required AS required
+            FROM module_progress mp JOIN training_modules tmod ON tmod.id = mp.module_id
+        """)
+        mp_rows = cursor.fetchall()
+
+    req_passed = defaultdict(int)
+    scores = defaultdict(list)
+    for r in mp_rows:
+        if r.get("required") and r.get("passed") and r.get("tid"):
+            req_passed[r["tid"]] += 1
+        if r.get("passed") and r.get("score") is not None:
+            try:
+                scores[r["tid"]].append(float(r["score"]))
+            except Exception:
+                pass
+
+    interview = {}
+    try:
+        cursor.execute("SELECT candidate_id AS cid, MAX(total_score) AS iv FROM phone_interviews GROUP BY candidate_id")
+        for r in cursor.fetchall():
+            interview[r["cid"]] = r["iv"]
+    except Exception:
+        pass
+
+    last_in = {}
+    try:
+        cursor.execute("SELECT candidate_id AS cid, MAX(clock_in) AS li FROM time_punches GROUP BY candidate_id")
+        for r in cursor.fetchall():
+            last_in[r["cid"]] = r["li"]
+    except Exception:
+        pass
+
+    hrs7 = defaultdict(float); hrs30 = defaultdict(float)
+    now = _dt.datetime.now()
+    cutoff30 = now - _dt.timedelta(days=30)
+    cutoff7 = now - _dt.timedelta(days=7)
+    try:
+        cursor.execute("SELECT candidate_id AS cid, clock_in, clock_out FROM time_punches WHERE clock_out IS NOT NULL AND clock_in >= %s", (cutoff30,))
+        for r in cursor.fetchall():
+            ci = r["clock_in"]; co = r["clock_out"]
+            if not ci or not co:
+                continue
+            h = (co - ci).total_seconds() / 3600.0
+            hrs30[r["cid"]] += h
+            if ci >= cutoff7:
+                hrs7[r["cid"]] += h
+    except Exception:
+        pass
+    conn.close()
+
+    rows = []
+    for c in crew:
+        tid = c["tid"]; cid = c["cid"]
+        rp = req_passed.get(tid, 0)
+        certified = (req_total > 0 and rp >= req_total)
+        sc = scores.get(tid, [])
+        avg = round(sum(sc) / len(sc)) if sc else None
+        h7 = round(hrs7.get(cid, 0.0), 1)
+        h30 = round(hrs30.get(cid, 0.0), 1)
+        if h7 > 0:
+            flag, fc = "Working this week", "#1e8449"
+        elif h30 > 0:
+            flag, fc = "Active this month", "#17a2b8"
+        elif certified:
+            flag, fc = "Certified – idle", "#e67e22"
+        elif rp > 0:
+            flag, fc = "In training", "#f39c12"
+        else:
+            flag, fc = "No activity", "#c0392b"
+        rows.append({
+            "name": (c["fn"] or "") + " " + (c["ln"] or ""), "cid": cid,
+            "status": c["status"] or "", "rp": rp, "cert": certified, "avg": avg,
+            "iv": interview.get(cid), "app": c["app_score"],
+            "h7": h7, "h30": h30, "last": last_in.get(cid),
+            "flag": flag, "fc": fc, "sort_flag": (0 if h7 > 0 else 1 if h30 > 0 else 2 if certified else 3 if rp > 0 else 4),
+        })
+    rows.sort(key=lambda r: (r["sort_flag"], -r["h30"], -r["rp"], r["name"].lower()))
+
+    working = sum(1 for r in rows if r["h7"] > 0)
+    certified_ct = sum(1 for r in rows if r["cert"])
+    dead = sum(1 for r in rows if r["flag"] == "No activity")
+
+    html = STYLE + admin_nav() + '<h1>Crew Evaluation</h1>'
+    html += '<p><a class="btn" href="/staff" style="background:#7f8c8d;">&larr; Back to Staff</a></p>'
+    html += ('<p style="margin:6px 0 14px;">'
+             '<span style="background:#eafaf1;border:1px solid #1e8449;color:#1e8449;padding:4px 12px;border-radius:14px;margin-right:8px;font-weight:600;">' + str(working) + ' worked this week</span>'
+             '<span style="background:#eef5f9;border:1px solid #17a2b8;color:#127a8a;padding:4px 12px;border-radius:14px;margin-right:8px;font-weight:600;">' + str(certified_ct) + ' certified</span>'
+             '<span style="background:#fdecea;border:1px solid #c0392b;color:#c0392b;padding:4px 12px;border-radius:14px;font-weight:600;">' + str(dead) + ' no activity</span>'
+             ' &nbsp; <span style="color:#888;">' + str(len(rows)) + ' total on the roster</span></p>')
+
+    if not rows:
+        html += '<p style="color:#999;">No staff or trainees on file yet.</p>'
+        return html
+
+    html += '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;min-width:820px;">'
+    html += ('<tr style="background:#2c3e50;color:#fff;">'
+             '<th style="padding:7px;text-align:left;">Employee</th>'
+             '<th style="padding:7px;">Evaluation</th>'
+             '<th style="padding:7px;">Status</th>'
+             '<th style="padding:7px;">Training</th>'
+             '<th style="padding:7px;">Test avg</th>'
+             '<th style="padding:7px;">Interview</th>'
+             '<th style="padding:7px;">Hrs 7d</th>'
+             '<th style="padding:7px;">Hrs 30d</th>'
+             '<th style="padding:7px;">Last worked</th></tr>')
+    for r in rows:
+        cert_txt = ('<span style="color:#1e8449;font-weight:600;">Certified</span>' if r["cert"]
+                    else (str(r["rp"]) + "/" + str(req_total) + " modules"))
+        avg_txt = (str(r["avg"]) + "%") if r["avg"] is not None else "&mdash;"
+        iv_txt = (str(r["iv"]) + "/100") if r["iv"] is not None else "&mdash;"
+        last_txt = str(r["last"])[:10] if r["last"] else '<span style="color:#c0392b;">never</span>'
+        h7c = "#1e8449" if r["h7"] > 0 else "#bbb"
+        html += ('<tr style="border-bottom:1px solid #eee;">'
+                 '<td style="padding:7px;"><a href="/staff/' + str(r["cid"]) + '">' + r["name"] + '</a></td>'
+                 '<td style="padding:7px;text-align:center;"><span style="background:' + r["fc"] + ';color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;white-space:nowrap;">' + r["flag"] + '</span></td>'
+                 '<td style="padding:7px;text-align:center;">' + r["status"] + '</td>'
+                 '<td style="padding:7px;text-align:center;">' + cert_txt + '</td>'
+                 '<td style="padding:7px;text-align:center;">' + avg_txt + '</td>'
+                 '<td style="padding:7px;text-align:center;">' + iv_txt + '</td>'
+                 '<td style="padding:7px;text-align:right;color:' + h7c + ';font-weight:600;">' + ("%.1f" % r["h7"]) + '</td>'
+                 '<td style="padding:7px;text-align:right;">' + ("%.1f" % r["h30"]) + '</td>'
+                 '<td style="padding:7px;text-align:center;font-size:12px;">' + last_txt + '</td></tr>')
+    html += '</table></div>'
+    html += '<p class="form-note" style="margin-top:10px;">Sorted by who is actually working. &ldquo;No activity&rdquo; = has never clocked in and has no training progress &mdash; your first candidates to re-engage or cut.</p>'
     return html
 
 
