@@ -2768,8 +2768,12 @@ def view_module(module_id):
                     html += f'<div class="radio-group"><label><input type="radio" name="q_{q["id"]}" value="{letter}" required> {opt}</label></div>'
             html += '</div>'
         html += '<button class="btn btn-success" type="submit">Submit Quiz</button></form>'
+    elif p and p['passed']:
+        html += '<p style="color:#1e8449;font-weight:600;">&#10003; Completed.</p>'
     else:
-        html += '<p class="form-note">No quiz set for this module yet. Check back later.</p>'
+        html += '<form method="POST" action="/training/module/' + str(module_id) + '/submit">'
+        html += '<p class="form-note">Review the video and instructions above, then confirm you have completed this module.</p>'
+        html += '<button class="btn btn-success" type="submit">I have completed this &mdash; Mark Complete</button></form>'
 
     html += '<p><a class="btn" href="/training">Back to My Training</a></p>'
     return html
@@ -2785,6 +2789,14 @@ def submit_quiz(module_id):
     questions = cursor.fetchall()
 
     if not questions:
+        # video / content-only module: mark complete when the trainee confirms
+        cursor.execute('SELECT * FROM module_progress WHERE trainee_id = %s AND module_id = %s', (trainee_id, module_id))
+        _ex = cursor.fetchone()
+        if _ex:
+            cursor.execute('UPDATE module_progress SET passed = 1, attempts = attempts + 1, completed_date = NOW() WHERE id = %s', (_ex['id'],))
+        else:
+            cursor.execute('INSERT INTO module_progress (trainee_id, module_id, passed, score, attempts, completed_date) VALUES (%s, %s, 1, NULL, 1, NOW())', (trainee_id, module_id))
+        conn.commit()
         conn.close()
         return redirect(f'/training/module/{module_id}')
 
