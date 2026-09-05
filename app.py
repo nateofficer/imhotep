@@ -1565,6 +1565,35 @@ def staff_evaluate():
                     bg_ok[_t] = True
     except Exception:
         pass
+    paid_total = defaultdict(float); paid_30 = defaultdict(float); paid_7 = {}; last_pay = {}
+    _c30 = cutoff30.date(); _c7 = cutoff7.date()
+    try:
+        cursor.execute("SELECT candidate_id AS cid, amount_paid AS amt, pay_date AS pd FROM payroll_payments")
+        for r in cursor.fetchall():
+            _cd = r.get("cid")
+            if _cd is None:
+                continue
+            _amt = float(r["amt"]) if r.get("amt") is not None else 0.0
+            paid_total[_cd] += _amt
+            _pd = r.get("pd"); _d = None
+            try:
+                if hasattr(_pd, "date"):
+                    _d = _pd.date()
+                elif isinstance(_pd, _dt.date):
+                    _d = _pd
+                elif _pd:
+                    _d = _dt.date.fromisoformat(str(_pd)[:10])
+            except Exception:
+                _d = None
+            if _d:
+                if (_cd not in last_pay) or (_d > last_pay[_cd]):
+                    last_pay[_cd] = _d
+                if _d >= _c30:
+                    paid_30[_cd] += _amt
+                if _d >= _c7:
+                    paid_7[_cd] = True
+    except Exception:
+        pass
     conn.close()
 
     rows = []
@@ -1576,9 +1605,11 @@ def staff_evaluate():
         avg = round(sum(sc) / len(sc)) if sc else None
         h7 = round(hrs7.get(cid, 0.0), 1)
         h30 = round(hrs30.get(cid, 0.0), 1)
-        if h7 > 0:
+        worked7 = (h7 > 0) or bool(paid_7.get(cid))
+        worked30 = (h30 > 0) or (paid_30.get(cid, 0) > 0)
+        if worked7:
             flag, fc = "Working this week", "#1e8449"
-        elif h30 > 0:
+        elif worked30:
             flag, fc = "Active this month", "#17a2b8"
         elif certified:
             flag, fc = "Certified – idle", "#e67e22"
@@ -1592,11 +1623,12 @@ def staff_evaluate():
             "iv": interview.get(cid), "app": c["app_score"],
             "h7": h7, "h30": h30, "last": last_in.get(cid),
             "ds": docs_signed.get(tid, 0), "dt": docs_total.get(tid, 0), "bg": bg_ok.get(tid, False),
-            "flag": flag, "fc": fc, "sort_flag": (0 if h7 > 0 else 1 if h30 > 0 else 2 if certified else 3 if rp > 0 else 4),
+            "paid30": round(paid_30.get(cid, 0), 2), "lastpay": last_pay.get(cid), "worked7": worked7,
+            "flag": flag, "fc": fc, "sort_flag": (0 if worked7 else 1 if worked30 else 2 if certified else 3 if rp > 0 else 4),
         })
     rows.sort(key=lambda r: (r["sort_flag"], -r["h30"], -r["rp"], r["name"].lower()))
 
-    working = sum(1 for r in rows if r["h7"] > 0)
+    working = sum(1 for r in rows if r.get("worked7"))
     certified_ct = sum(1 for r in rows if r["cert"])
     dead = sum(1 for r in rows if r["flag"] == "No activity")
     bg_cleared = sum(1 for r in rows if r.get("bg"))
@@ -1624,14 +1656,25 @@ def staff_evaluate():
              '<th style="padding:7px;">Interview</th>'
              '<th style="padding:7px;">Hrs 7d</th>'
              '<th style="padding:7px;">Hrs 30d</th>'
+             '<th style="padding:7px;">Paid 30d</th>'
              '<th style="padding:7px;">Docs</th>'
-             '<th style="padding:7px;">Last worked</th></tr>')
+             '<th style="padding:7px;">Last active</th></tr>')
     for r in rows:
         cert_txt = ('<span style="color:#1e8449;font-weight:600;">Certified</span>' if r["cert"]
                     else (str(r["rp"]) + "/" + str(req_total) + " modules"))
         avg_txt = (str(r["avg"]) + "%") if r["avg"] is not None else "&mdash;"
         iv_txt = (str(r["iv"]) + "/100") if r["iv"] is not None else "&mdash;"
-        last_txt = str(r["last"])[:10] if r["last"] else '<span style="color:#c0392b;">never</span>'
+        _lc = r["last"]
+        try:
+            _lc = _lc.date() if hasattr(_lc, "date") else _lc
+        except Exception:
+            pass
+        _lp = r.get("lastpay")
+        _la = None
+        for _x in (_lc, _lp):
+            if _x is not None and (_la is None or _x > _la):
+                _la = _x
+        last_txt = str(_la)[:10] if _la else '<span style="color:#c0392b;">never</span>'
         if r["dt"]:
             docs_txt = ('<span style="color:#1e8449;font-weight:600;">' if (r["ds"] >= r["dt"]) else '<span style="color:#e67e22;">') + str(r["ds"]) + '/' + str(r["dt"]) + '</span>'
             if r["bg"]:
@@ -1648,10 +1691,11 @@ def staff_evaluate():
                  '<td style="padding:7px;text-align:center;">' + iv_txt + '</td>'
                  '<td style="padding:7px;text-align:right;color:' + h7c + ';font-weight:600;">' + ("%.1f" % r["h7"]) + '</td>'
                  '<td style="padding:7px;text-align:right;">' + ("%.1f" % r["h30"]) + '</td>'
+                 '<td style="padding:7px;text-align:right;">' + (('$%.0f' % r["paid30"]) if r["paid30"] else '<span style="color:#bbb;">&mdash;</span>') + '</td>'
                  '<td style="padding:7px;text-align:center;font-size:12px;">' + docs_txt + '</td>'
                  '<td style="padding:7px;text-align:center;font-size:12px;">' + last_txt + '</td></tr>')
     html += '</table></div>'
-    html += '<p class="form-note" style="margin-top:10px;">Sorted by who is actually working. &ldquo;No activity&rdquo; = has never clocked in and has no training progress &mdash; your first candidates to re-engage or cut.</p>'
+    html += '<p class="form-note" style="margin-top:10px;">Sorted by who is actually working. &ldquo;No activity&rdquo; = has never clocked in, been paid, or made training progress &mdash; your first candidates to re-engage or cut.</p>'
     return html
 
 
