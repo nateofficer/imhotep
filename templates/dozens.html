@@ -1,264 +1,322 @@
-<!DOCTYPE html>
+{% raw %}<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>The Dozens</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Name the Group</title>
 <style>
-  :root{
-    --ink:#17121c;
-    --ink-2:#221a2b;
-    --yellow:#ffe23d;
-    --pink:#ff3d8a;
-    --cyan:#37e1c4;
-    --paper:#f7f3e9;
-    --stage:#0e0a12;
-  }
-  *{box-sizing:border-box;margin:0;padding:0}
-  html,body{height:100%}
-  body{
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-    background:
-      radial-gradient(1200px 600px at 50% -10%, #2a1d38 0%, transparent 60%),
-      var(--ink);
-    color:var(--paper);
-    min-height:100%;
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    padding:24px 18px 40px;
-    overflow-x:hidden;
-  }
-
-  /* ---- header ---- */
-  header{text-align:center;margin-top:6px}
-  .brand{
-    font-family:Impact,Haettenschweiler,"Arial Narrow Bold",sans-serif;
-    font-size:clamp(52px,16vw,120px);
-    line-height:.86;
-    letter-spacing:1px;
-    text-transform:uppercase;
-    color:var(--yellow);
-    text-shadow:
-      4px 4px 0 var(--pink),
-      8px 8px 0 rgba(0,0,0,.35);
-    transform:rotate(-2.5deg);
-  }
-  .brand .the{
-    display:block;
-    font-size:.34em;
-    color:var(--cyan);
-    text-shadow:3px 3px 0 rgba(0,0,0,.4);
-    letter-spacing:6px;
-    margin-bottom:-.08em;
-    transform:rotate(1.5deg);
-  }
-  .tag{
-    margin-top:16px;
-    font-size:clamp(13px,3.4vw,17px);
-    letter-spacing:2px;
-    text-transform:uppercase;
-    color:var(--paper);
-    opacity:.8;
-  }
-
-  /* ---- stage ---- */
-  .stage{
-    width:min(620px,94vw);
-    margin:26px auto 0;
-    background:var(--stage);
-    border:3px solid var(--yellow);
-    border-radius:20px;
-    padding:30px 26px;
-    min-height:230px;
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    justify-content:center;
-    text-align:center;
-    box-shadow:0 18px 0 -6px rgba(0,0,0,.4), 0 0 0 6px var(--ink-2);
-    position:relative;
-  }
-  .badge{
-    position:absolute;top:-16px;left:50%;transform:translateX(-50%);
-    background:var(--pink);color:#fff;
-    font-family:Impact,sans-serif;letter-spacing:1px;
-    font-size:14px;padding:6px 16px;border-radius:999px;
-    text-transform:uppercase;white-space:nowrap;
-    box-shadow:0 4px 0 rgba(0,0,0,.35);
-  }
-  .art{width:170px;height:170px;margin-bottom:8px}
-  .art svg{width:100%;height:100%;display:block}
-  .snap{
-    font-family:Impact,Haettenschweiler,"Arial Narrow Bold",sans-serif;
-    font-size:clamp(26px,6.6vw,40px);
-    line-height:1.04;
-    text-transform:uppercase;
-    color:var(--paper);
-  }
-  .snap .hl{color:var(--cyan)}
-  .placeholder{color:#8a7f97;font-size:clamp(18px,4.6vw,24px);
-    font-family:Impact,sans-serif;text-transform:uppercase;letter-spacing:1px}
-
-  /* ---- controls ---- */
-  .mic{
-    margin-top:30px;
-    font-family:Impact,Haettenschweiler,sans-serif;
-    font-size:clamp(22px,6vw,30px);
-    letter-spacing:1.5px;
-    text-transform:uppercase;
-    color:var(--ink);
-    background:var(--yellow);
-    border:none;
-    padding:20px 34px;
-    border-radius:16px;
-    cursor:pointer;
-    box-shadow:0 8px 0 #c9a800;
-    transition:transform .06s ease, box-shadow .06s ease;
-  }
-  .mic:hover{background:#fff04d}
-  .mic:active{transform:translateY(6px);box-shadow:0 2px 0 #c9a800}
-  .mic:focus-visible{outline:4px solid var(--cyan);outline-offset:4px}
-
-  .count{
-    margin-top:18px;font-size:14px;letter-spacing:3px;
-    text-transform:uppercase;color:var(--paper);opacity:.55;
-  }
-
-  footer{
-    margin-top:34px;font-size:12px;letter-spacing:1.5px;
-    text-transform:uppercase;color:var(--paper);opacity:.4;text-align:center;
-  }
-
-  /* ---- reveal animation ---- */
-  @keyframes pop{
-    0%{transform:scale(.9) rotate(-1deg);opacity:0}
-    60%{transform:scale(1.04) rotate(.6deg)}
-    100%{transform:scale(1) rotate(0);opacity:1}
-  }
-  .reveal{animation:pop .32s cubic-bezier(.2,1.3,.4,1)}
-  @media (prefers-reduced-motion:reduce){
-    .reveal{animation:none}
-    .mic{transition:none}
-  }
+  :root{ --yellow:#f6d43a; --pink:#ff5da2; --bg:#1a1725; --card:#0e0c16; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:#fff; font-family:-apple-system,
+        BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+        min-height:100vh; display:flex; align-items:flex-start;
+        justify-content:center; padding:22px 16px 60px; }
+  .wrap{ width:100%; max-width:560px; }
+  h1{ font-weight:900; font-size:44px; letter-spacing:1px; line-height:.95;
+      margin:6px 0 2px; color:var(--yellow);
+      text-shadow:3px 3px 0 var(--pink); text-transform:uppercase; }
+  .tag{ letter-spacing:3px; font-size:13px; color:#b9b3c9; font-weight:700;
+        text-transform:uppercase; margin-bottom:18px; }
+  .card{ background:var(--card); border:3px solid var(--yellow);
+         border-radius:22px; padding:24px 20px; }
+  label{ display:block; font-weight:800; font-size:14px; margin:14px 0 6px;
+         color:#d8d3e6; letter-spacing:.4px; }
+  input[type=text]{ width:100%; padding:14px 14px; font-size:17px;
+         border-radius:12px; border:2px solid #3a3550; background:#141020;
+         color:#fff; outline:none; }
+  input[type=text]:focus{ border-color:var(--yellow); }
+  .row{ display:flex; gap:10px; }
+  .row .yn{ flex:1; }
+  button{ font-family:inherit; cursor:pointer; }
+  .yn{ padding:13px; font-size:16px; font-weight:800; border-radius:12px;
+       border:2px solid #3a3550; background:#141020; color:#fff; }
+  .yn.on{ background:var(--yellow); color:#000; border-color:var(--yellow); }
+  .go{ width:100%; margin-top:20px; padding:16px; font-size:20px;
+       font-weight:900; border:none; border-radius:14px; background:var(--yellow);
+       color:#000; text-transform:uppercase; letter-spacing:1px; }
+  .go:disabled{ opacity:.4; }
+  .subject{ font-size:34px; font-weight:900; color:var(--yellow);
+            text-align:center; margin:6px 0 2px; text-transform:lowercase; }
+  .ask{ text-align:center; color:#cfc9dd; font-weight:700; font-size:15px;
+        letter-spacing:.5px; margin-bottom:16px; }
+  .meta{ display:flex; justify-content:space-between; align-items:center;
+         margin-top:16px; font-weight:800; font-size:15px; color:#cfc9dd; }
+  .lives{ letter-spacing:2px; font-size:18px; }
+  .flash{ min-height:26px; text-align:center; font-weight:800; margin-top:14px;
+          font-size:16px; }
+  .flash.ok{ color:#5ee08a; }
+  .flash.no{ color:var(--pink); }
+  .big{ font-size:40px; font-weight:900; color:var(--yellow); text-align:center;
+        margin:4px 0; }
+  .lead{ text-align:center; color:#e7e3f2; font-size:17px; margin:2px 0 4px; }
+  .crown{ text-align:center; margin-top:14px; padding:12px; border-radius:14px;
+          background:#141020; border:2px solid #2c2740; font-weight:800; }
+  .crown .who{ color:var(--yellow); }
+  .played{ text-align:center; color:#8f89a3; font-size:13px; margin-top:18px;
+           letter-spacing:.5px; }
+  .cta{ display:block; text-align:center; text-decoration:none; margin-top:18px;
+        padding:14px; border-radius:12px; background:#e07b2f; color:#fff;
+        font-weight:800; font-size:16px; }
+  .link{ background:none; border:none; color:#9b95af; text-decoration:underline;
+         font-size:14px; margin-top:16px; display:block; width:100%; }
+  .foot{ text-align:center; color:#6f6a82; font-size:12px; letter-spacing:2px;
+         margin-top:22px; text-transform:uppercase; }
+  .hidden{ display:none; }
 </style>
 </head>
 <body>
-  <header>
-    <h1 class="brand"><span class="the">Playing</span>The Dozens</h1>
-    <p class="tag">Tap the mic &middot; drop a snap</p>
-  </header>
+<div class="wrap">
+  <h1>Name<br>the Group</h1>
+  <div class="tag">What is a group of ___ called?</div>
 
-  <main class="stage" id="stage" aria-live="polite">
-    <div class="placeholder" id="content">Hit the mic to start the cypher &rarr;</div>
-  </main>
+  <!-- INTAKE -->
+  <div class="card" id="intake">
+    <label for="pname">First name</label>
+    <input type="text" id="pname" placeholder="e.g. Nate" autocomplete="given-name">
 
-  <button class="mic" id="mic" aria-label="Drop a snap">🎤 Drop a Snap</button>
-  <p class="count" id="count">Snap #0</p>
+    <label>Need a home cleaning?</label>
+    <div class="row">
+      <button class="yn" id="ynYes" type="button">Yes</button>
+      <button class="yn" id="ynNo"  type="button">No</button>
+    </div>
 
-  <footer>All jokes &middot; no malice &middot; keep it funny</footer>
+    <div id="contactWrap" class="hidden">
+      <label for="pcontact">Where can we reach you? (email or phone)</label>
+      <input type="text" id="pcontact" placeholder="you@email.com or (702) 555-0123">
+    </div>
+
+    <button class="go" id="startBtn" type="button" disabled>Start the game</button>
+    <div class="crown" id="crownIntake"></div>
+    <div class="played" id="playedIntake"></div>
+  </div>
+
+  <!-- GAME -->
+  <div class="card hidden" id="game">
+    <div class="ask">What is a group of</div>
+    <div class="subject" id="subject">crows</div>
+    <div class="ask">called?</div>
+    <input type="text" id="answer" placeholder="Type your answer" autocomplete="off">
+    <button class="go" id="guessBtn" type="button">Submit</button>
+    <div class="flash" id="flash"></div>
+    <div class="meta">
+      <span>Score: <span id="score">0</span></span>
+      <span class="lives" id="lives">&#10084;&#10084;&#10084;</span>
+    </div>
+  </div>
+
+  <!-- GAME OVER -->
+  <div class="card hidden" id="over">
+    <div class="lead">Game over</div>
+    <div class="big"><span id="finalScore">0</span></div>
+    <div class="lead" id="finalLine">groups named</div>
+    <div class="crown" id="crownOver"></div>
+    <a class="cta" href="/quote">Want the real thing? Get a free quote &rarr;</a>
+    <button class="link" id="againBtn" type="button">Play again</button>
+    <div class="played" id="playedOver"></div>
+  </div>
+
+  <div class="foot">All in good fun &middot; Casey's Cleaning</div>
+</div>
 
 <script>
-/* ---------- TEXT SNAPS (absurd, crowd-friendly) ---------- */
-const textSnaps = [
-  // --- mama ---
-  "Yo mama so old, her Social Security number is <b>1</b>.",
-  "Yo mama so extra, she <b>waves at security cameras</b> just in case.",
-  "Yo mama so dramatic, she needs a <b>soundtrack</b> to open the fridge.",
-  // --- sister ---
-  "Yo sister so competitive, she demands a <b>rematch</b> from the Magic 8-Ball.",
-  "Yo sister so extra, she <b>claps for her own jokes</b> before the punchline.",
-  "Yo sister so lucky, she found a parking spot in a <b>dream</b> and it was still there when she woke up.",
-  // --- brother ---
-  "Yo brother so slow, he came <b>last</b> in a race he ran by himself.",
-  "Yo brother so confused, he brought a <b>spoon</b> to a knife fight and won by accident.",
-  "Yo brother so bold, he cut the line at a line <b>he started</b>.",
-  // --- cousin ---
-  "Yo cousin so sneaky, his own <b>shadow</b> filed a missing person report.",
-  "Yo cousin so late, he showed up to his own <b>surprise party</b> a week after.",
-  // --- grandma ---
-  "Yo grandma so classic, the museum keeps trying to <b>frame her</b>.",
-  "Yo grandma so sharp, she <b>corrects the GPS</b>.",
-  "Yo grandma so bold, she wants a <b>rematch</b> from the DMV.",
-  // --- grandpa ---
-  "Yo grandpa so old, his first birthday candle was a <b>real fire</b>.",
-  "Yo grandpa so stubborn, GPS just says <b>'do whatever you want.'</b>",
-  // --- uncle ---
-  "Yo uncle so cheap, he <b>reuses</b> his birthday candles.",
-  "Yo uncle so broke, he put a <b>single fry</b> on layaway.",
-  // --- aunt ---
-  "Yo aunt so extra, she needs an <b>entrance theme</b> to leave a voicemail.",
-  "Yo aunt so dramatic, she <b>sighs in cursive</b>.",
-  // --- kids ---
-  "Yo kids so clumsy, they tripped over the <b>WiFi signal</b>.",
-  "Yo kids so loud, the fire alarm calls <b>THEM</b> for backup.",
-  // --- you ---
-  "You so late, your own <b>alarm clock</b> gave up on you.",
-  "You so bold, you brought <b>receipts</b> to a staring contest.",
-  "You so extra, you <b>bow</b> after leaving a group chat."
+// ---- question bank: subject -> accepted answers (lowercase) --------------
+var BANK = [
+ ["crows",["murder"]],["ravens",["unkindness","conspiracy"]],["lions",["pride"]],
+ ["wolves",["pack"]],["foxes",["skulk","leash"]],["bears",["sloth"]],
+ ["tigers",["streak","ambush"]],["leopards",["leap"]],["elephants",["herd","parade"]],
+ ["giraffes",["tower"]],["zebras",["dazzle","zeal"]],["rhinos",["crash"]],
+ ["kangaroos",["mob","troop"]],["monkeys",["troop","barrel"]],["apes",["shrewdness"]],
+ ["baboons",["congress","troop"]],["pandas",["embarrassment"]],["cats",["clowder","glaring"]],
+ ["kittens",["litter","kindle"]],["rats",["mischief"]],["mice",["mischief"]],
+ ["squirrels",["scurry","dray"]],["rabbits",["colony","fluffle","nest"]],
+ ["hedgehogs",["prickle","array"]],["porcupines",["prickle"]],["skunks",["surfeit"]],
+ ["badgers",["cete"]],["otters",["romp","raft","family"]],["ferrets",["business"]],
+ ["moles",["labour","labor"]],["bats",["colony","cloud","cauldron"]],
+ ["boars",["sounder"]],["pigs",["drove","litter","sounder"]],["goats",["tribe","trip","herd"]],
+ ["sheep",["flock","mob","herd"]],["oxen",["team","yoke"]],["cattle",["herd","drove"]],
+ ["dogs",["pack","kennel"]],["puppies",["litter"]],["hyenas",["cackle","clan"]],
+ ["deer",["herd"]],["horses",["herd","team"]],["donkeys",["drove","herd"]],
+ ["camels",["caravan","train"]],["buffalo",["herd","gang","obstinacy"]],
+ ["owls",["parliament"]],["eagles",["convocation"]],["hawks",["cast","kettle","boil"]],
+ ["falcons",["cast"]],["vultures",["committee","kettle","wake"]],["buzzards",["wake"]],
+ ["crows_birds",["murder"]],["magpies",["parliament","tiding"]],["starlings",["murmuration"]],
+ ["sparrows",["host","quarrel"]],["finches",["charm"]],["goldfinches",["charm"]],
+ ["hummingbirds",["charm","bouquet"]],["larks",["exaltation"]],["nightingales",["watch"]],
+ ["swallows",["flight","gulp"]],["woodpeckers",["descent"]],["jays",["party","scold"]],
+ ["peacocks",["ostentation","muster","pride"]],["pheasants",["nye","bouquet"]],
+ ["quail",["covey","bevy"]],["partridges",["covey"]],["grouse",["covey","pack"]],
+ ["turkeys",["rafter","gang"]],["chickens",["brood","clutch","peep"]],
+ ["ducks",["raft","paddling","team","flock"]],["geese",["gaggle","skein","flock"]],
+ ["swans",["bevy","lamentation","wedge"]],["doves",["dole","pitying","flight"]],
+ ["parrots",["pandemonium","company"]],["cockatoos",["crackle"]],
+ ["penguins",["colony","waddle","rookery"]],["puffins",["circus","colony"]],
+ ["pelicans",["pod","scoop","squadron"]],["cranes",["siege","sedge"]],
+ ["herons",["siege","sedge"]],["storks",["muster","mustering"]],
+ ["flamingos",["flamboyance","stand","colony"]],["gulls",["colony","screech","squabble"]],
+ ["cormorants",["gulp"]],["crows2",["murder"]],["ravens2",["unkindness"]],
+ ["emus",["mob"]],["ostriches",["flock","wobble"]],["woodcocks",["fall"]],
+ ["fish",["school","shoal"]],["sharks",["shiver","school"]],["whales",["pod","gam"]],
+ ["dolphins",["pod","school"]],["seals",["colony","harem","rookery"]],
+ ["walruses",["herd","huddle","pod"]],["stingrays",["fever"]],["jellyfish",["smack","bloom"]],
+ ["eels",["swarm","bed"]],["trout",["hover"]],["herring",["army","shoal"]],
+ ["octopuses",["consortium"]],["starfish",["constellation","galaxy"]],
+ ["crabs",["cast","consortium"]],["lobsters",["risk"]],["oysters",["bed"]],
+ ["clams",["bed"]],["snails",["walk","rout","escargatoire"]],["slugs",["cornucopia"]],
+ ["turtles",["bale","nest","turn"]],["tortoises",["creep"]],["crocodiles",["bask","float"]],
+ ["alligators",["congregation"]],["lizards",["lounge"]],["iguanas",["mess"]],
+ ["frogs",["army"]],["toads",["knot"]],["salamanders",["maelstrom","congress"]],
+ ["snakes",["nest","bed","pit"]],["cobras",["quiver"]],["vipers",["nest"]],
+ ["ants",["colony","army"]],["bees",["swarm","hive","grist"]],["wasps",["nest","pledge"]],
+ ["hornets",["nest"]],["butterflies",["kaleidoscope","flutter","swarm"]],
+ ["moths",["whisper","eclipse"]],["caterpillars",["army"]],["locusts",["plague","swarm","cloud"]],
+ ["crickets",["orchestra"]],["flies",["swarm","business","cloud"]],
+ ["ladybugs",["loveliness","bloom"]],["cockroaches",["intrusion"]],
+ ["dragonflies",["cluster","flight"]],["grasshoppers",["cloud","swarm"]],
+ ["spiders",["cluster","clutter"]],["termites",["colony","swarm"]],
+ ["worms",["clew","bunch","bed"]],["gnats",["cloud","swarm","horde"]],
+ ["actors",["cast","troupe","company"]],["musicians",["band","ensemble"]],
+ ["singers",["choir","chorus"]],["dancers",["troupe","company"]],
+ ["angels",["host","choir"]],["witches",["coven"]],["knights",["banner","rout"]],
+ ["soldiers",["army","platoon","squad","troop"]],["sailors",["crew","watch"]],
+ ["thieves",["gang","den"]],["judges",["bench","panel"]],["nuns",["convent","superfluity"]],
+ ["monks",["community","abomination"]],["lawyers",["eloquence","disputation","quarrel"]],
+ ["students",["class","cohort"]],["photographers",["click","flash"]],
+ ["girls",["giggle","gaggle"]],["ladies",["bevy","galaxy"]],
+ ["lies",["pack"]],["arrows",["quiver","sheaf"]],["flowers",["bouquet","bunch","posy"]],
+ ["roses",["bouquet","bunch"]],["grapes",["bunch","cluster"]],["bananas",["hand","bunch"]],
+ ["keys",["bunch","ring","set"]],["bells",["peal","carillon"]],
+ ["stars",["constellation","galaxy","cluster"]],["ships",["fleet","armada","flotilla"]],
+ ["cars",["fleet","convoy"]],["islands",["archipelago","chain","group"]],
+ ["mountains",["range","chain","massif"]],["trees",["forest","grove","copse","stand"]],
+ ["mushrooms",["troop","cluster"]],["wheat",["sheaf","shock"]],["eggs",["clutch","dozen"]],
+ ["books",["library","series","stack"]],["paper",["ream","sheaf"]],
+ ["pearls",["string","strand","rope"]],["cards",["deck","pack","hand"]],
+ ["dice",["pair","set"]],["stairs",["flight"]],["rooms",["suite"]],
+ ["balloons",["bunch","bouquet"]],["clouds",["bank"]],["waves",["set","swell"]],
+ ["singers2",["choir"]],["ships2",["fleet"]],["wolves2",["pack"]]
 ];
 
-/* ---------- PICTURE SNAPS (surprise cartoon payoff) ---------- */
-const picSnaps = [
-  { art:"planet", text:"Yo mama so big, she's got her own little <b>moon</b> following her." },
-  { art:"snail",  text:"Yo mama so slow, this <b>snail</b> is still waiting on her." },
-  { art:"mummy",  text:"Yo mama so old, <b>dinosaurs</b> asked HER for advice." },
-  { art:"wallet", text:"Yo mama so broke, even the <b>moths</b> moved out." },
-  { art:"mega",   text:"Yo mama so loud, this <b>whole page</b> can hear her." },
-  { art:"banana", text:"Yo mama so clumsy, she found the <b>ONE banana peel</b> in the city." }
-];
+// de-dupe subjects that share display text (keys with digits/underscores are alt slugs)
+function displaySubject(s){ return s.replace(/[0-9_].*$/,"").replace(/_/g," "); }
 
-/* ---------- CARTOONS (inline SVG, fully offline) ---------- */
-const YEL="#ffe23d", PNK="#ff3d8a", CYN="#37e1c4", DK="#0e0a12", WHT="#f7f3e9";
-const art = {
-  planet:`<svg viewBox="0 0 200 200"><circle cx="95" cy="105" r="66" fill="${YEL}" stroke="${DK}" stroke-width="6"/><ellipse cx="95" cy="118" rx="82" ry="20" fill="none" stroke="${PNK}" stroke-width="7"/><circle cx="80" cy="95" r="7" fill="${DK}"/><circle cx="112" cy="95" r="7" fill="${DK}"/><path d="M78 128 q17 16 34 0" fill="none" stroke="${DK}" stroke-width="6" stroke-linecap="round"/><circle cx="163" cy="60" r="13" fill="${CYN}" stroke="${DK}" stroke-width="5"/></svg>`,
-  snail:`<svg viewBox="0 0 200 200"><path d="M40 150 q0 -14 20 -14 h70" fill="none" stroke="${DK}" stroke-width="7" stroke-linecap="round"/><circle cx="90" cy="112" r="42" fill="${CYN}" stroke="${DK}" stroke-width="6"/><circle cx="90" cy="112" r="24" fill="none" stroke="${DK}" stroke-width="5"/><circle cx="90" cy="112" r="9" fill="none" stroke="${DK}" stroke-width="4"/><path d="M132 138 q22 -4 24 -30" fill="none" stroke="${DK}" stroke-width="7" stroke-linecap="round"/><circle cx="156" cy="104" r="9" fill="${YEL}" stroke="${DK}" stroke-width="5"/><circle cx="156" cy="103" r="3" fill="${DK}"/><line x1="150" y1="97" x2="146" y2="86" stroke="${DK}" stroke-width="5" stroke-linecap="round"/><text x="60" y="70" font-size="26" fill="${PNK}" font-family="Impact,sans-serif">z z</text></svg>`,
-  mummy:`<svg viewBox="0 0 200 200"><rect x="66" y="40" width="68" height="120" rx="26" fill="${WHT}" stroke="${DK}" stroke-width="6"/><line x1="66" y1="70" x2="134" y2="66" stroke="${DK}" stroke-width="5"/><line x1="66" y1="92" x2="134" y2="96" stroke="${DK}" stroke-width="5"/><line x1="66" y1="116" x2="134" y2="112" stroke="${DK}" stroke-width="5"/><line x1="66" y1="140" x2="134" y2="144" stroke="${DK}" stroke-width="5"/><circle cx="86" cy="82" r="6" fill="${DK}"/><circle cx="114" cy="82" r="6" fill="${DK}"/><path d="M40 40 l20 16 M40 40 l4 24 M40 40 l24 4" stroke="${CYN}" stroke-width="4" stroke-linecap="round"/><circle cx="40" cy="40" r="5" fill="${CYN}"/></svg>`,
-  wallet:`<svg viewBox="0 0 200 200"><rect x="42" y="78" width="116" height="74" rx="12" fill="${PNK}" stroke="${DK}" stroke-width="6"/><path d="M42 96 h116" stroke="${DK}" stroke-width="5"/><circle cx="138" cy="115" r="9" fill="${YEL}" stroke="${DK}" stroke-width="5"/><g stroke="${DK}" stroke-width="4" fill="${WHT}"><ellipse cx="98" cy="50" rx="10" ry="16"/><ellipse cx="82" cy="52" rx="12" ry="8"/><ellipse cx="114" cy="52" rx="12" ry="8"/></g><line x1="98" y1="66" x2="98" y2="78" stroke="${DK}" stroke-width="4" stroke-dasharray="4 5"/></svg>`,
-  mega:`<svg viewBox="0 0 200 200"><path d="M40 88 l40 -8 v40 l-40 -8 z" fill="${YEL}" stroke="${DK}" stroke-width="6" stroke-linejoin="round"/><path d="M80 78 l46 -22 v88 l-46 -22 z" fill="${PNK}" stroke="${DK}" stroke-width="6" stroke-linejoin="round"/><path d="M140 74 q16 26 0 52" fill="none" stroke="${CYN}" stroke-width="6" stroke-linecap="round"/><path d="M154 62 q28 38 0 76" fill="none" stroke="${CYN}" stroke-width="6" stroke-linecap="round"/></svg>`,
-  banana:`<svg viewBox="0 0 200 200"><circle cx="96" cy="52" r="16" fill="${YEL}" stroke="${DK}" stroke-width="5"/><path d="M96 68 l14 34 M96 68 l-16 30" stroke="${DK}" stroke-width="6" stroke-linecap="round"/><path d="M104 84 l26 -6 M92 82 l-24 10" stroke="${DK}" stroke-width="6" stroke-linecap="round"/><path d="M64 150 q16 -22 40 -18 q22 4 30 20 z" fill="${YEL}" stroke="${DK}" stroke-width="5" stroke-linejoin="round"/><path d="M84 138 q14 -8 34 4" fill="none" stroke="${DK}" stroke-width="4"/><path d="M110 108 l10 10 M120 108 l-10 10" stroke="${PNK}" stroke-width="5" stroke-linecap="round"/></svg>`
-};
-
-/* ---------- ENGINE ---------- */
-const stage=document.getElementById('stage');
-const content=document.getElementById('content');
-const mic=document.getElementById('mic');
-const countEl=document.getElementById('count');
-let count=0, lastText=-1, lastPic=-1;
-
-function pick(arr,last){
-  let i; do{ i=Math.floor(Math.random()*arr.length); } while(arr.length>1 && i===last);
-  return i;
+function shuffle(a){
+  for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1));
+    var t=a[i]; a[i]=a[j]; a[j]=t; } return a;
+}
+function norm(s){
+  return (s||"").toLowerCase().trim()
+    .replace(/^(a|an|the)\s+/,"")
+    .replace(/[.!?,;:'"()]/g,"")
+    .replace(/\s+/g," ").trim();
 }
 
-function drop(){
-  count++;
-  countEl.textContent="Snap #"+count;
-  const showPic = count % 4 === 0;      // surprise picture every 4th snap
-  stage.classList.remove('reveal'); void stage.offsetWidth; // restart anim
+var state = { name:"", needs:null, deck:[], idx:0, score:0, misses:0 };
 
-  const old=stage.querySelector('.badge'); if(old) old.remove();
-  const badge=document.createElement('div'); badge.className='badge';
+var $ = function(id){ return document.getElementById(id); };
 
-  if(showPic){
-    lastPic=pick(picSnaps,lastPic);
-    const p=picSnaps[lastPic];
-    badge.textContent="📸 that's a picture, baby";
-    content.innerHTML=`<div class="art">${art[p.art]}</div><div class="snap">${p.text.replace(/<b>/g,'<span class="hl">').replace(/<\/b>/g,'</span>')}</div>`;
-  } else {
-    lastText=pick(textSnaps,lastText);
-    badge.textContent="🔥 straight up";
-    content.className="";
-    content.innerHTML=`<div class="snap">${textSnaps[lastText].replace(/<b>/g,'<span class="hl">').replace(/<\/b>/g,'</span>')}</div>`;
-  }
-  stage.appendChild(badge);
-  stage.classList.add('reveal');
+// ---- intake wiring -------------------------------------------------------
+function refreshStart(){
+  var ok = $("pname").value.trim().length > 0 && state.needs !== null;
+  if(state.needs === true) ok = ok && $("pcontact").value.trim().length > 2;
+  $("startBtn").disabled = !ok;
 }
-
-mic.addEventListener('click',drop);
-document.addEventListener('keydown',e=>{
-  if(e.code==='Space' && document.activeElement!==mic){ e.preventDefault(); drop(); }
+$("pname").addEventListener("input", refreshStart);
+$("pcontact") && $("pcontact").addEventListener("input", refreshStart);
+$("ynYes").addEventListener("click", function(){
+  state.needs = true; $("ynYes").classList.add("on"); $("ynNo").classList.remove("on");
+  $("contactWrap").classList.remove("hidden"); refreshStart();
 });
+$("ynNo").addEventListener("click", function(){
+  state.needs = false; $("ynNo").classList.add("on"); $("ynYes").classList.remove("on");
+  $("contactWrap").classList.add("hidden"); refreshStart();
+});
+
+function loadTop(){
+  fetch("/dozens/top").then(function(r){ return r.json(); }).then(function(d){
+    paintTop(d);
+  }).catch(function(){});
+}
+function paintTop(d){
+  var txt = (d.top) ? ('&#128081; Top score: <span class="who">' + escapeHtml(d.top.name)
+              + '</span> &mdash; ' + d.top.score)
+              : '&#128081; No high score yet &mdash; be the first!';
+  $("crownIntake").innerHTML = txt;
+  $("crownOver").innerHTML = txt;
+  var p = (d.played||0);
+  var pl = "Games played: " + p;
+  $("playedIntake").textContent = pl;
+  $("playedOver").textContent = pl;
+}
+function escapeHtml(s){ var d=document.createElement("div"); d.textContent=s||""; return d.innerHTML; }
+
+$("startBtn").addEventListener("click", function(){
+  state.name = $("pname").value.trim();
+  var contact = state.needs === true ? $("pcontact").value.trim() : "";
+  fetch("/dozens/start", {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ name: state.name, needs_cleaning: state.needs, contact: contact })
+  }).catch(function(){});
+  startGame();
+});
+
+// ---- game loop -----------------------------------------------------------
+function startGame(){
+  state.deck = shuffle(BANK.slice()); state.idx = 0; state.score = 0; state.misses = 0;
+  $("intake").classList.add("hidden"); $("over").classList.add("hidden");
+  $("game").classList.remove("hidden");
+  $("score").textContent = "0"; setLives(); nextQ(); $("answer").focus();
+}
+function setLives(){
+  var left = 3 - state.misses; var s = "";
+  for(var i=0;i<3;i++){ s += (i<left) ? "\u2764" : "\u2717"; }
+  $("lives").innerHTML = s;
+}
+function nextQ(){
+  if(state.idx >= state.deck.length) state.deck = shuffle(BANK.slice()), state.idx = 0;
+  var item = state.deck[state.idx];
+  $("subject").textContent = displaySubject(item[0]);
+  $("answer").value = ""; $("answer").focus();
+}
+function submitGuess(){
+  var item = state.deck[state.idx];
+  var accepted = item[1].map(norm);
+  var guess = norm($("answer").value);
+  if(!guess) return;
+  if(accepted.indexOf(guess) !== -1){
+    state.score++; $("score").textContent = state.score;
+    flash("Correct!", "ok");
+  } else {
+    state.misses++; setLives();
+    flash("Nope \u2014 it's a " + item[1][0], "no");
+    if(state.misses >= 3){ setTimeout(endGame, 850); return; }
+  }
+  state.idx++; setTimeout(nextQ, 650);
+}
+function flash(msg, cls){
+  var f = $("flash"); f.textContent = msg; f.className = "flash " + cls;
+  setTimeout(function(){ if(f.textContent===msg){ f.textContent=""; f.className="flash"; } }, 1100);
+}
+$("guessBtn").addEventListener("click", submitGuess);
+$("answer").addEventListener("keydown", function(e){ if(e.key==="Enter") submitGuess(); });
+
+function endGame(){
+  $("game").classList.add("hidden"); $("over").classList.remove("hidden");
+  $("finalScore").textContent = state.score;
+  $("finalLine").textContent = state.score === 1 ? "group named" : "groups named";
+  if(state.score > 0){
+    fetch("/dozens/score", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ name: state.name, score: state.score })
+    }).then(function(r){ return r.json(); }).then(paintTop).catch(loadTop);
+  } else { loadTop(); }
+}
+$("againBtn").addEventListener("click", function(){
+  $("over").classList.add("hidden"); $("intake").classList.remove("hidden");
+  state.needs = null; $("ynYes").classList.remove("on"); $("ynNo").classList.remove("on");
+  $("contactWrap").classList.add("hidden"); $("startBtn").disabled = true; loadTop();
+});
+
+loadTop();
 </script>
 </body>
-</html>
+</html>{% endraw %}

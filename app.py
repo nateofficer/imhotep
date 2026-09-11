@@ -7642,6 +7642,142 @@ except Exception:
 # === END RESET_ANALYTICS_V1 ===
 
 
+
+# --- DOZENS_GROUP_V1: NAME THE GROUP game backend ----------------------
+def _dozens_db_init():
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("CREATE TABLE IF NOT EXISTS dozens_scores "
+                    "(id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(80), "
+                    " score INT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+        cur.execute("CREATE TABLE IF NOT EXISTS dozens_stats "
+                    "(k VARCHAR(40) PRIMARY KEY, v INT)")
+        cur.execute("INSERT IGNORE INTO dozens_stats (k, v) VALUES ('games_played', 0)")
+        conn.commit()
+    except Exception as e:
+        print("dozens init:", repr(e))
+
+
+def _dozens_get_top():
+    from flask import jsonify
+    top = None; played = 0
+    try:
+        _dozens_db_init()
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("SELECT name, score FROM dozens_scores "
+                    "ORDER BY score DESC, id ASC LIMIT 1")
+        row = cur.fetchone()
+        if row:
+            top = {"name": row["name"], "score": row["score"]}
+        cur.execute("SELECT v FROM dozens_stats WHERE k='games_played'")
+        r2 = cur.fetchone()
+        if r2:
+            played = r2["v"]
+    except Exception as e:
+        print("dozens top:", repr(e))
+    return jsonify({"top": top, "played": played})
+
+
+def _dozens_save_lead(name, contact):
+    # Schema-adaptive: only writes columns the leads table actually has, so
+    # it can never break on an unexpected schema. Wrapped by caller in try.
+    conn = get_db(); cur = conn.cursor()
+    cur.execute("DESCRIBE leads")
+    cols = set()
+    for c in cur.fetchall():
+        f = c.get("Field") if isinstance(c, dict) else c[0]
+        if f:
+            cols.add(f)
+    email = ""; phone = ""
+    digits = sum(ch.isdigit() for ch in contact)
+    if "@" in contact:
+        email = contact
+    elif digits >= 7:
+        phone = contact
+    else:
+        email = contact  # fallback so the contact is never lost
+    row = {}
+    if "name" in cols:   row["name"] = name or "Name the Group player"
+    if "email" in cols:  row["email"] = email
+    if "phone" in cols:  row["phone"] = phone
+    for sc in ("source", "src"):
+        if sc in cols:
+            row[sc] = "the-dozens"; break
+    if "city" in cols:   row["city"] = ""
+    if "status" in cols: row["status"] = "New"
+    note = "From Name the Group game. Contact: " + contact
+    if "notes" in cols:     row["notes"] = note
+    elif "message" in cols: row["message"] = note
+    if not row:
+        return
+    fields = ", ".join("`" + k + "`" for k in row)
+    marks = ", ".join(["%s"] * len(row))
+    cur.execute("INSERT INTO leads (" + fields + ") VALUES (" + marks + ")",
+                list(row.values()))
+    conn.commit()
+
+
+def _dozens_start():
+    from flask import request, jsonify
+    data = request.get_json(silent=True) or request.form
+    name = (data.get("name") or "").strip()[:80]
+    needs = str(data.get("needs_cleaning") or "").lower() in ("1", "true", "yes", "y", "on")
+    contact = (data.get("contact") or "").strip()[:200]
+    try:
+        _dozens_db_init()
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("UPDATE dozens_stats SET v = v + 1 WHERE k='games_played'")
+        conn.commit()
+    except Exception as e:
+        print("dozens start:", repr(e))
+    if needs and contact:
+        try:
+            _dozens_save_lead(name, contact)
+        except Exception as e:
+            print("dozens lead:", repr(e))
+    return jsonify({"ok": True})
+
+
+def _dozens_score():
+    from flask import request
+    data = request.get_json(silent=True) or request.form
+    name = (data.get("name") or "").strip()[:80] or "Anonymous"
+    try:
+        score = int(data.get("score") or 0)
+    except Exception:
+        score = 0
+    if score < 0:
+        score = 0
+    try:
+        _dozens_db_init()
+        if score > 0:
+            conn = get_db(); cur = conn.cursor()
+            cur.execute("INSERT INTO dozens_scores (name, score) VALUES (%s, %s)",
+                        (name, score))
+            conn.commit()
+    except Exception as e:
+        print("dozens score:", repr(e))
+    return _dozens_get_top()
+
+
+def _dozens_register():
+    have = set()
+    try:
+        have = {r.rule for r in app.url_map.iter_rules()}
+    except Exception:
+        pass
+    if "/dozens/top" not in have:
+        app.add_url_rule("/dozens/top", "dozens_top", _dozens_get_top, methods=["GET"])
+    if "/dozens/start" not in have:
+        app.add_url_rule("/dozens/start", "dozens_start", _dozens_start, methods=["POST"])
+    if "/dozens/score" not in have:
+        app.add_url_rule("/dozens/score", "dozens_score", _dozens_score, methods=["POST"])
+
+
+_dozens_register()
+# --- end DOZENS_GROUP_V1 ----------------------------------------------
+
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
