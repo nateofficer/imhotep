@@ -617,7 +617,7 @@ def home():
         <a href="/jobs">Careers</a>
         <a href="/login">Admin</a>
         <a href="/trainee-login">Staff</a>
-        <a href="/dozens">The Dozens</a>
+        <a href="/dozens">Name the Group</a>
     </div>
     '''
 

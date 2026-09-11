@@ -46,6 +46,11 @@
           font-size:16px; }
   .flash.ok{ color:#5ee08a; }
   .flash.no{ color:var(--pink); }
+  .timerwrap{ display:flex; align-items:center; gap:10px; margin:6px 0 14px; }
+  .timerbar{ flex:1; height:10px; background:#2c2740; border-radius:6px; overflow:hidden; }
+  .timerfill{ height:100%; width:100%; background:var(--yellow); border-radius:6px;
+              transition:width .9s linear; }
+  .secs{ font-weight:900; font-size:15px; color:#cfc9dd; min-width:34px; text-align:right; }
   .big{ font-size:40px; font-weight:900; color:var(--yellow); text-align:center;
         margin:4px 0; }
   .lead{ text-align:center; color:#e7e3f2; font-size:17px; margin:2px 0 4px; }
@@ -95,6 +100,7 @@
     <div class="ask">What is a group of</div>
     <div class="subject" id="subject">crows</div>
     <div class="ask">called?</div>
+    <div class="timerwrap"><div class="timerbar"><div class="timerfill" id="timerFill"></div></div><span class="secs" id="secs">8s</span></div>
     <input type="text" id="answer" placeholder="Type your answer" autocomplete="off">
     <button class="go" id="guessBtn" type="button">Submit</button>
     <div class="flash" id="flash"></div>
@@ -210,7 +216,30 @@ function norm(s){
     .replace(/\s+/g," ").trim();
 }
 
-var state = { name:"", needs:null, deck:[], idx:0, score:0, misses:0 };
+var DURATION = 8; // seconds per question (running out = a miss)
+var state = { name:"", needs:null, deck:[], idx:0, score:0, misses:0, timer:null, timeLeft:DURATION };
+
+function clearTimer(){ if(state.timer){ clearInterval(state.timer); state.timer=null; } }
+function paintTimer(){
+  var pct = Math.max(0, state.timeLeft) / DURATION * 100;
+  var fill = $("timerFill"); if(fill){ fill.style.width = pct + "%";
+    fill.style.background = state.timeLeft <= 3 ? "var(--pink)" : "var(--yellow)"; }
+  var s = $("secs"); if(s){ s.textContent = Math.max(0, state.timeLeft) + "s"; }
+}
+function startTimer(){
+  clearTimer(); state.timeLeft = DURATION; paintTimer();
+  state.timer = setInterval(function(){
+    state.timeLeft--; paintTimer();
+    if(state.timeLeft <= 0){ clearTimer(); handleMiss(state.deck[state.idx][1][0], true); }
+  }, 1000);
+}
+function handleMiss(correct, timedOut){
+  state.misses++; setLives();
+  flash((timedOut ? "Time! it's a " : "Nope \u2014 it's a ") + correct, "no");
+  state.idx++;
+  if(state.misses >= 3){ setTimeout(endGame, 850); return; }
+  setTimeout(nextQ, 650);
+}
 
 var $ = function(id){ return document.getElementById(id); };
 
@@ -276,21 +305,21 @@ function nextQ(){
   var item = state.deck[state.idx];
   $("subject").textContent = displaySubject(item[0]);
   $("answer").value = ""; $("answer").focus();
+  startTimer();
 }
 function submitGuess(){
   var item = state.deck[state.idx];
   var accepted = item[1].map(norm);
   var guess = norm($("answer").value);
   if(!guess) return;
+  clearTimer();
   if(accepted.indexOf(guess) !== -1){
     state.score++; $("score").textContent = state.score;
     flash("Correct!", "ok");
+    state.idx++; setTimeout(nextQ, 650);
   } else {
-    state.misses++; setLives();
-    flash("Nope \u2014 it's a " + item[1][0], "no");
-    if(state.misses >= 3){ setTimeout(endGame, 850); return; }
+    handleMiss(item[1][0], false);
   }
-  state.idx++; setTimeout(nextQ, 650);
 }
 function flash(msg, cls){
   var f = $("flash"); f.textContent = msg; f.className = "flash " + cls;
@@ -300,6 +329,7 @@ $("guessBtn").addEventListener("click", submitGuess);
 $("answer").addEventListener("keydown", function(e){ if(e.key==="Enter") submitGuess(); });
 
 function endGame(){
+  clearTimer();
   $("game").classList.add("hidden"); $("over").classList.remove("hidden");
   $("finalScore").textContent = state.score;
   $("finalLine").textContent = state.score === 1 ? "group named" : "groups named";
@@ -311,6 +341,7 @@ function endGame(){
   } else { loadTop(); }
 }
 $("againBtn").addEventListener("click", function(){
+  clearTimer();
   $("over").classList.add("hidden"); $("intake").classList.remove("hidden");
   state.needs = null; $("ynYes").classList.remove("on"); $("ynNo").classList.remove("on");
   $("contactWrap").classList.add("hidden"); $("startBtn").disabled = true; loadTop();
