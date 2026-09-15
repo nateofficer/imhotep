@@ -18,6 +18,13 @@ load_dotenv()
 
 app = Flask(__name__)
 
+
+# --- GSC verification route (googlee3774b91017e73e8) ---
+@app.route("/googlee3774b91017e73e8.html")
+def _gsc_verify_googlee3774b91017e73e8():
+    return "google-site-verification: googlee3774b91017e73e8.html"
+# --- end GSC verification route ---
+
 # Secret key for sessions
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-change-me')
 app.config['SESSION_COOKIE_SECURE'] = True
