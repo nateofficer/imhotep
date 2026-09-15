@@ -19,6 +19,35 @@ load_dotenv()
 app = Flask(__name__)
 
 
+
+# --- sitemap.xml route (imhotep-auto) ---
+@app.route("/sitemap.xml")
+def _imhotep_sitemap_xml():
+    from flask import Response
+    base = "https://caseyscleaning.net"
+    pages = [
+        ("/", "1.0", "weekly"),
+        ("/quote", "0.8", "monthly"),
+        ("/jobs", "0.5", "monthly"),
+    ]
+    items = ""
+    for path, priority, changefreq in pages:
+        items += (
+            "  <url>\n"
+            f"    <loc>{base}{path}</loc>\n"
+            f"    <changefreq>{changefreq}</changefreq>\n"
+            f"    <priority>{priority}</priority>\n"
+            "  </url>\n"
+        )
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        + items +
+        "</urlset>\n"
+    )
+    return Response(xml, mimetype="application/xml")
+# --- end sitemap.xml route ---
+
 # --- GSC verification route (googlee3774b91017e73e8) ---
 @app.route("/googlee3774b91017e73e8.html")
 def _gsc_verify_googlee3774b91017e73e8():
