@@ -7814,6 +7814,83 @@ _dozens_register()
 # --- end DOZENS_GROUP_V1 ----------------------------------------------
 
 
+
+# === MARKETING STUDIO (MKT_STUDIO_V1) — added by patch_marketing_studio_piece1.py ===
+from flask import session as _mkt_session, abort as _mkt_abort
+
+_MKT_CHANNELS = ["Google Search Ads", "Facebook", "Nextdoor", "Craigslist",
+                 "Instagram", "Yelp", "Thumbtack", "X",
+                 "Property-manager email", "Review request"]
+_MKT_CITIES = ["Las Vegas", "Salt Lake City"]
+_MKT_FOCUS  = ["Residential (standard)", "Deep clean", "Move-out / turnover",
+               "Airbnb / short-term", "Commercial / office"]
+
+def _mkt_opts(items):
+    return "".join("<option>%s</option>" % it for it in items)
+
+def _mkt_page(result_html=""):
+    nav = admin_nav()
+    return ("""<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Marketing Studio</title>
+<style>
+ body{font-family:system-ui,Arial,sans-serif;background:#faf7f2;margin:0;color:#222}
+ .wrap{max-width:760px;margin:0 auto;padding:20px}
+ h1{color:#5C3D2E;margin-bottom:4px}
+ .card{background:#fff;border-radius:10px;padding:20px;margin:16px 0;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+ label{display:block;font-weight:600;margin:12px 0 4px}
+ select,textarea{width:100%;padding:10px;border:1px solid #ccc;border-radius:6px;font-size:15px;box-sizing:border-box}
+ textarea{min-height:80px}
+ .btn{margin-top:16px;background:#5C3D2E;color:#fff;border:0;border-radius:6px;padding:12px 20px;font-size:16px;cursor:pointer}
+ .btn[disabled]{opacity:.5;cursor:not-allowed}
+ .muted{color:#888;font-size:13px}
+ .result{white-space:pre-wrap;min-height:60px}
+</style></head><body>
+""" + nav + """
+<div class="wrap">
+ <h1>Marketing Studio</h1>
+ <p class="muted">Generate ready-to-post content to get Casey&#39;s in front of customers, by channel.</p>
+ <form class="card" method="post" action="/marketing/generate">
+  <label>Channel</label>
+  <select name="channel">""" + _mkt_opts(_MKT_CHANNELS) + """</select>
+  <label>City</label>
+  <select name="city">""" + _mkt_opts(_MKT_CITIES) + """</select>
+  <label>Service focus</label>
+  <select name="focus">""" + _mkt_opts(_MKT_FOCUS) + """</select>
+  <label>Angle or notes <span class="muted">(optional)</span></label>
+  <textarea name="angle" placeholder="e.g. veteran-owned, background-checked, recurring-plan savings"></textarea>
+  <button class="btn" type="submit" disabled>Generate  (wired up in the next step)</button>
+ </form>
+ <div class="card">
+  <label>Result</label>
+  <div class="result muted">""" + (result_html or "Your generated copy will appear here.") + """</div>
+ </div>
+</div></body></html>""")
+
+def _mkt_studio():
+    if not _mkt_session.get("logged_in"):
+        _mkt_abort(404)
+    return _mkt_page()
+
+app.add_url_rule("/marketing", "marketing", _mkt_studio)
+
+# inject a "Marketing" link into the admin nav, for logged-in admins only
+_mkt_orig_admin_nav = admin_nav
+def admin_nav(*_a, **_k):
+    _html = _mkt_orig_admin_nav(*_a, **_k)
+    try:
+        if _mkt_session.get("logged_in") and 'href="/marketing"' not in _html:
+            _link = ' <a href="/marketing">Marketing</a>'
+            if "</nav>" in _html:
+                _html = _html.replace("</nav>", _link + "</nav>", 1)
+            else:
+                _html = _html + _link
+    except Exception:
+        pass
+    return _html
+# === END MARKETING STUDIO (MKT_STUDIO_V1) ===
+
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
