@@ -7859,7 +7859,7 @@ def _mkt_page(result_html=""):
   <select name="focus">""" + _mkt_opts(_MKT_FOCUS) + """</select>
   <label>Angle or notes <span class="muted">(optional)</span></label>
   <textarea name="angle" placeholder="e.g. veteran-owned, background-checked, recurring-plan savings"></textarea>
-  <button class="btn" type="submit" disabled>Generate  (wired up in the next step)</button>
+  <button class="btn" type="submit">Generate copy</button>
  </form>
  <div class="card">
   <label>Result</label>
@@ -7873,6 +7873,74 @@ def _mkt_studio():
     return _mkt_page()
 
 app.add_url_rule("/marketing", "marketing", _mkt_studio)
+
+from flask import request as _mkt_request
+
+def _mkt_esc(s):
+    return str(s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+def _mkt_ai_generate(channel, city, focus, angle):
+    key = _rnd_os.environ.get("ANTHROPIC_API_KEY")
+    if not key:
+        return None, "No API key on the server (ANTHROPIC_API_KEY is not set in Render)."
+    prompt = (
+        "You are a marketing copywriter for Casey's Cleaning Company, a house-cleaning business. "
+        "Write ready-to-post marketing copy for the channel below.\n\n"
+        "Business facts to weave in naturally (do not list them robotically):\n"
+        "- Veteran-owned, bonded and insured, background-checked crew\n"
+        "- Serving " + (city or "the local area") + "\n"
+        "- New customers get $25 off their first clean\n"
+        "- Free 60-second online quote at caseyscleaning.net\n\n"
+        "Channel: " + (channel or "general") + "\n"
+        "Service focus: " + (focus or "general cleaning") + "\n"
+        "Extra angle or notes from the owner: " + (angle or "(none)") + "\n\n"
+        "Match the format and length that performs on that channel:\n"
+        "- Google Search Ads: give 3 headlines (max 30 characters each) and 2 descriptions (max 90 characters each), labeled.\n"
+        "- Facebook or Instagram: a short engaging post with 1-2 emojis; for Instagram add a few relevant hashtags.\n"
+        "- Nextdoor: a warm, neighborly post, no hard selling.\n"
+        "- Craigslist: a clear title line plus a short body.\n"
+        "- Otherwise: a concise, compelling post.\n\n"
+        "Write only the finished copy, ready to paste. Plain text, no markdown symbols like # or *."
+    )
+    payload = {"model": _RND_AI_MODEL, "max_tokens": 900,
+               "messages": [{"role": "user", "content": prompt}]}
+    data = _rnd_json.dumps(payload).encode("utf-8")
+    req = _rnd_urlreq.Request(
+        "https://api.anthropic.com/v1/messages", data=data,
+        headers={"content-type": "application/json", "x-api-key": key,
+                 "anthropic-version": "2023-06-01"}, method="POST")
+    try:
+        with _rnd_urlreq.urlopen(req, timeout=60) as resp:
+            raw = resp.read().decode("utf-8")
+        obj = _rnd_json.loads(raw)
+        parts = [b.get("text", "") for b in obj.get("content", []) if b.get("type") == "text"]
+        text = "\n".join(p for p in parts if p).strip()
+        return (text, None) if text else (None, "The API responded but returned no text.")
+    except _rnd_urlerr.HTTPError as e:
+        try:
+            detail = e.read().decode("utf-8")[:300]
+        except Exception:
+            detail = ""
+        return None, "API error " + str(e.code) + ": " + detail
+    except Exception as e:
+        return None, "Could not reach the API: " + str(e)
+
+def _mkt_generate():
+    if not _mkt_session.get("logged_in"):
+        _mkt_abort(404)
+    channel = (_mkt_request.form.get("channel") or "").strip()
+    city = (_mkt_request.form.get("city") or "").strip()
+    focus = (_mkt_request.form.get("focus") or "").strip()
+    angle = (_mkt_request.form.get("angle") or "").strip()
+    text, err = _mkt_ai_generate(channel, city, focus, angle)
+    if err:
+        body = '<span style="color:#c0392b;">' + _mkt_esc(err) + '</span>'
+    else:
+        body = '<span style="color:#222;">' + _mkt_esc(text) + '</span>'
+    return _mkt_page(result_html=body)
+
+app.add_url_rule("/marketing/generate", "marketing_generate", _mkt_generate, methods=["POST"])
+
 
 # inject a "Marketing" link into the admin nav, for logged-in admins only
 _mkt_orig_admin_nav = admin_nav
