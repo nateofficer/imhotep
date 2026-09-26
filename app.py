@@ -7959,6 +7959,34 @@ def admin_nav(*_a, **_k):
 # === END MARKETING STUDIO (MKT_STUDIO_V1) ===
 
 
+
+# ARCHIVE_OLD_APPLICANTS_V1
+@app.route('/admin/archive-applicants', methods=['GET','POST'])
+def archive_applicants():
+    if not session.get('logged_in'):
+        return redirect('/login')
+    db = get_db()
+    cur = db.cursor()
+    keep = ('Active','Scheduling','Training','Onboarding','Hired')
+    fmt  = ','.join(['%s']*len(keep))
+    if request.method == 'POST' and request.form.get('confirm') == 'ARCHIVE':
+        cur.execute(f"UPDATE candidates SET status='Archived' WHERE status NOT IN ({fmt})", keep)
+        db.commit()
+        count = cur.rowcount
+        return f'<h2 style="font-family:sans-serif">Done! {count} applicants archived.</h2><p style="font-family:sans-serif">Staff and Trainees untouched.</p><a href="/applications">Go to Applications</a>'
+    cur.execute(f"SELECT COUNT(*) as n FROM candidates WHERE status NOT IN ({fmt})", keep)
+    row = cur.fetchone()
+    count = row['n']
+    return f'''<div style="font-family:sans-serif;max-width:500px;margin:60px auto;padding:30px;border:1px solid #ccc;border-radius:10px">
+    <h2>Archive Old Applicants</h2>
+    <p><strong>{count} applicants</strong> will be archived.</p>
+    <p>Staff and Trainees (Active, Scheduling, Training, Onboarding, Hired) will NOT be touched.</p>
+    <form method="POST"><p>Type <strong>ARCHIVE</strong> to confirm:</p>
+    <input name="confirm" style="padding:8px;font-size:16px;width:200px"><br><br>
+    <button type="submit" style="background:#c0392b;color:white;padding:10px 24px;border:none;border-radius:6px;font-size:16px;cursor:pointer">Archive Now</button>
+    </form><br><a href="/applications">Cancel</a></div>'''
+app.add_url_rule('/admin/archive-applicants','archive_applicants',archive_applicants,methods=['GET','POST'])
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
