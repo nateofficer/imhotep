@@ -7967,7 +7967,7 @@ def archive_applicants():
         return redirect('/login')
     db = get_db()
     cur = db.cursor()
-    keep = ('Active','Scheduling','Training','Onboarding')
+    keep = ('Active','Scheduling','Training')
     fmt  = ','.join(['%s']*len(keep))
     if request.method == 'POST' and request.form.get('confirm') == 'ARCHIVE':
         cur.execute(f"UPDATE candidates SET status='Archived' WHERE status NOT IN ({fmt})", keep)
