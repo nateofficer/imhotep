@@ -735,7 +735,7 @@ def dashboard():
         LIMIT 5
     ''')
     recent_apps = cursor.fetchall()
-    cursor.execute("SELECT COUNT(*) as cnt FROM candidates WHERE status != 'Archived'")
+    cursor.execute("SELECT COUNT(*) as cnt FROM candidates WHERE status IN ('Applied','Reviewing','Vetted','Onboarding','Scheduling')")
     app_count = cursor.fetchone()['cnt']
 
     # Active trainees
