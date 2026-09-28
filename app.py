@@ -1744,7 +1744,7 @@ def view_applications():
         SELECT candidates.*, jobs.title as job_title
         FROM candidates
         LEFT JOIN jobs ON candidates.job_id = jobs.id
-        WHERE (candidates.status IS NULL OR candidates.status NOT IN ('Active', 'Scheduling'))
+        WHERE (candidates.status IS NULL OR candidates.status NOT IN ('Active', 'Scheduling', 'Archived'))
         ORDER BY candidates.flagged ASC, candidates.score DESC, candidates.applied_date DESC
     ''')
     apps = cursor.fetchall()
