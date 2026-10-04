@@ -7714,6 +7714,43 @@ def _dozens_get_top():
     return jsonify({"top": top, "played": played})
 
 
+# NOTIFY_OWNER_NEW_LEAD_V1 - reusable owner alert for any real-inquiry door
+def notify_owner_new_lead(first_name="", last_name="", phone="", email="",
+                          source="", city="", notes=""):
+    """Email the owner the instant a real inquiry lands, so they call back fast.
+    Fires only when there is a phone or email to reach the person.
+    Fail-safe: never raises - a mail hiccup must not block the lead from saving."""
+    if not (phone or email):
+        return False
+    import os, smtplib
+    from email.mime.text import MIMEText
+    api_key     = os.environ.get("RESEND_API_KEY")
+    owner_email = os.environ.get("GMAIL_USER") or os.environ.get("OWNER_EMAIL")
+    from_addr   = os.environ.get("MAIL_FROM", "quotes@caseyscleaning.net")
+    if not api_key or not owner_email:
+        return False
+    name = (first_name + " " + last_name).strip() or "New lead"
+    body = "\n".join(["New lead - call them back ASAP.", "",
+        "Name:   " + name,
+        "Phone:  " + (phone or "-"),
+        "Email:  " + (email or "-"),
+        "Source: " + (source or "unknown"),
+    ] + (["City:   " + city] if city else [])
+      + (["Notes:  " + notes] if notes else []))
+    try:
+        msg = MIMEText(body)
+        msg["Subject"]  = "New lead: " + name + " (" + (source or "web") + ")"
+        msg["From"]     = from_addr
+        msg["To"]       = owner_email
+        msg["Reply-To"] = email or from_addr
+        s = smtplib.SMTP("smtp.resend.com", 587, timeout=15)
+        s.starttls(); s.login("resend", api_key)
+        s.sendmail(from_addr, [owner_email], msg.as_string()); s.quit()
+        return True
+    except Exception as e:
+        print("LEAD ALERT FAILED:", repr(e), flush=True)
+        return False
+
 def _dozens_save_lead(name, contact):
     # Schema-adaptive: only writes columns the leads table actually has, so
     # it can never break on an unexpected schema. Wrapped by caller in try.
@@ -7769,6 +7806,7 @@ def _dozens_start():
     if needs and contact:
         try:
             _dozens_save_lead(name, contact)
+            notify_owner_new_lead(first_name=name, email=(contact if "@" in contact else ""), phone=("" if "@" in contact else contact), source="the-dozens")
         except Exception as e:
             print("dozens lead:", repr(e))
     return jsonify({"ok": True})
