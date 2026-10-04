@@ -7751,16 +7751,26 @@ def notify_owner_new_lead(first_name="", last_name="", phone="", email="",
         print("LEAD ALERT FAILED:", repr(e), flush=True)
         return False
 
-def _dozens_save_lead(name, contact):
-    # Schema-adaptive: only writes columns the leads table actually has, so
-    # it can never break on an unexpected schema. Wrapped by caller in try.
+def _dozens_save_lead(name, contact):  # DOZENS_SAVE_LEAD_V2
+    # Schema-adaptive for real: reads the leads table's actual columns AND which
+    # ones are required (NOT NULL, no default), so the insert can't be rejected
+    # for a missing field. Maps the player's name into first_name/last_name.
     conn = get_db(); cur = conn.cursor()
     cur.execute("DESCRIBE leads")
-    cols = set()
+    cols = set(); required = []
     for c in cur.fetchall():
-        f = c.get("Field") if isinstance(c, dict) else c[0]
-        if f:
-            cols.add(f)
+        if isinstance(c, dict):
+            field = c.get("Field"); ctype = c.get("Type", "")
+            null = c.get("Null"); default = c.get("Default"); extra = c.get("Extra", "")
+        else:
+            vals = (list(c) + [None] * 6)[:6]
+            field, ctype, null, _key, default, extra = vals
+        if not field:
+            continue
+        cols.add(field)
+        if null == "NO" and default is None and "auto_increment" not in str(extra or "").lower():
+            required.append((field, str(ctype or "")))
+
     email = ""; phone = ""
     digits = sum(ch.isdigit() for ch in contact)
     if "@" in contact:
@@ -7769,11 +7779,17 @@ def _dozens_save_lead(name, contact):
         phone = contact
     else:
         email = contact  # fallback so the contact is never lost
+
+    full = (name or "").strip() or "Name the Group player"
+    first, _, last = full.partition(" ")
+
     row = {}
-    if "name" in cols:   row["name"] = name or "Name the Group player"
-    if "email" in cols:  row["email"] = email
-    if "phone" in cols:  row["phone"] = phone
-    for sc in ("source", "src"):
+    if "name" in cols:       row["name"] = full
+    if "first_name" in cols: row["first_name"] = first
+    if "last_name" in cols:  row["last_name"] = last
+    if "email" in cols:      row["email"] = email
+    if "phone" in cols:      row["phone"] = phone
+    for sc in ("source", "src", "lead_source"):
         if sc in cols:
             row[sc] = "the-dozens"; break
     if "city" in cols:   row["city"] = ""
@@ -7781,14 +7797,20 @@ def _dozens_save_lead(name, contact):
     note = "From Name the Group game. Contact: " + contact
     if "notes" in cols:     row["notes"] = note
     elif "message" in cols: row["message"] = note
+
+    # Fill any REQUIRED column we haven't set, so a NOT NULL field can't reject
+    # the whole insert. Numeric types get 0, everything else an empty string.
+    for field, ctype in required:
+        if field not in row:
+            t = ctype.lower()
+            row[field] = 0 if any(k in t for k in ("int", "decimal", "float", "double")) else ""
+
     if not row:
         return
     fields = ", ".join("`" + k + "`" for k in row)
-    marks = ", ".join(["%s"] * len(row))
-    cur.execute("INSERT INTO leads (" + fields + ") VALUES (" + marks + ")",
-                list(row.values()))
+    marks  = ", ".join(["%s"] * len(row))
+    cur.execute("INSERT INTO leads (" + fields + ") VALUES (" + marks + ")", list(row.values()))
     conn.commit()
-
 
 def _dozens_start():
     from flask import request, jsonify
