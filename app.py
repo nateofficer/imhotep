@@ -8047,10 +8047,10 @@ def archive_applicants():
     </form><br><a href="/applications">Cancel</a></div>'''
 app.add_url_rule('/admin/archive-applicants','archive_applicants',archive_applicants,methods=['GET','POST'])
 
-# DIALZARA_HOOK_V1 - receive call data from Dialzara, save cleaning leads, alert owner
+# DIALZARA_HOOK_V2 - receive call data from Dialzara, save cleaning leads, alert owner
 def _hook_find(obj, key):
-    # Find the first value for `key` anywhere in a nested dict/list, so we don't
-    # have to assume how Dialzara wraps the fields - we just locate them.
+    # Find the first non-empty value for `key` anywhere in a nested dict/list,
+    # so we don't depend on how Dialzara wraps the fields - we just locate them.
     if isinstance(obj, dict):
         if key in obj and obj[key] not in (None, ""):
             return obj[key]
@@ -8067,8 +8067,8 @@ def _hook_find(obj, key):
 
 
 def _insert_lead_adaptive(name="", phone="", email="", source="", service_type="", notes="", city=""):
-    # Same schema-adaptive insert the game uses: writes only columns that exist,
-    # fills any required (NOT NULL, no default) column so the insert can't be rejected.
+    # Schema-adaptive insert: writes only columns that exist, fills any required
+    # (NOT NULL, no default) column so the insert can't be rejected.
     conn = get_db(); cur = conn.cursor()
     cur.execute("DESCRIBE leads")
     cols = set(); required = []
@@ -8124,14 +8124,18 @@ def _dialzara_hook(token):
             data = json.loads(request.get_data(as_text=True) or "{}")
         except Exception:
             data = request.form.to_dict() if request.form else {}
+    # Structured field first, Dialzara's native field as a fallback, so a value
+    # lands even when one source is empty.
     name    = str(_hook_find(data, "caller_name") or "").strip()
-    phone   = str(_hook_find(data, "caller_phone") or "").strip()
-    stype   = str(_hook_find(data, "service_type") or "").strip()
-    summary = str(_hook_find(data, "call_summary") or "").strip()
+    phone   = str(_hook_find(data, "caller_phone") or _hook_find(data, "callerIdPhone") or "").strip()
+    stype   = str(_hook_find(data, "service_type") or _hook_find(data, "serviceType") or "").strip()
+    summary = str(_hook_find(data, "call_summary") or _hook_find(data, "summary") or "").strip()
     intent  = str(_hook_find(data, "is_cleaning_inquiry") or "").strip().lower()
-    is_cleaning = intent in ("yes", "y", "true", "1", "cleaning")
-    # Only a real cleaning inquiry with a callback number becomes a lead + alert.
-    if is_cleaning and phone:
+    # Two-gate design: Dialzara's "Only send when" filter is the front gate; here
+    # we block anything explicitly flagged NOT a cleaning inquiry, and require a
+    # callback number. Ambiguous/blank is allowed through (don't drop a real lead).
+    not_cleaning = intent in ("no", "n", "false", "0", "spam")
+    if phone and not not_cleaning:
         note = "From phone call (Dialzara)." + ((" " + summary) if summary else "")
         try:
             _insert_lead_adaptive(name=name, phone=phone, source="dialzara",
