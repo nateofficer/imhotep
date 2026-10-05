@@ -8047,6 +8047,109 @@ def archive_applicants():
     </form><br><a href="/applications">Cancel</a></div>'''
 app.add_url_rule('/admin/archive-applicants','archive_applicants',archive_applicants,methods=['GET','POST'])
 
+# DIALZARA_HOOK_V1 - receive call data from Dialzara, save cleaning leads, alert owner
+def _hook_find(obj, key):
+    # Find the first value for `key` anywhere in a nested dict/list, so we don't
+    # have to assume how Dialzara wraps the fields - we just locate them.
+    if isinstance(obj, dict):
+        if key in obj and obj[key] not in (None, ""):
+            return obj[key]
+        for v in obj.values():
+            r = _hook_find(v, key)
+            if r is not None:
+                return r
+    elif isinstance(obj, list):
+        for v in obj:
+            r = _hook_find(v, key)
+            if r is not None:
+                return r
+    return None
+
+
+def _insert_lead_adaptive(name="", phone="", email="", source="", service_type="", notes="", city=""):
+    # Same schema-adaptive insert the game uses: writes only columns that exist,
+    # fills any required (NOT NULL, no default) column so the insert can't be rejected.
+    conn = get_db(); cur = conn.cursor()
+    cur.execute("DESCRIBE leads")
+    cols = set(); required = []
+    for c in cur.fetchall():
+        if isinstance(c, dict):
+            field = c.get("Field"); ctype = c.get("Type", "")
+            null = c.get("Null"); default = c.get("Default"); extra = c.get("Extra", "")
+        else:
+            vals = (list(c) + [None] * 6)[:6]
+            field, ctype, null, _key, default, extra = vals
+        if not field:
+            continue
+        cols.add(field)
+        if null == "NO" and default is None and "auto_increment" not in str(extra or "").lower():
+            required.append((field, str(ctype or "")))
+    full = (name or "").strip()
+    first, _, last = full.partition(" ")
+    row = {}
+    if "name" in cols and full:                  row["name"] = full
+    if "first_name" in cols:                     row["first_name"] = first
+    if "last_name" in cols:                      row["last_name"] = last
+    if "email" in cols:                          row["email"] = email
+    if "phone" in cols:                          row["phone"] = phone
+    if "service_type" in cols and service_type:  row["service_type"] = service_type
+    for sc in ("source", "src", "lead_source"):
+        if sc in cols:
+            row[sc] = source or "web"; break
+    if "city" in cols:   row["city"] = city
+    if "status" in cols: row["status"] = "New"
+    if "notes" in cols:     row["notes"] = notes
+    elif "message" in cols: row["message"] = notes
+    for field, ctype in required:
+        if field not in row:
+            t = ctype.lower()
+            row[field] = 0 if any(k in t for k in ("int", "decimal", "float", "double")) else ""
+    if not row:
+        return
+    fields = ", ".join("`" + k + "`" for k in row)
+    marks  = ", ".join(["%s"] * len(row))
+    cur.execute("INSERT INTO leads (" + fields + ") VALUES (" + marks + ")", list(row.values()))
+    conn.commit()
+
+
+def _dialzara_hook(token):
+    from flask import request, jsonify
+    import os, json
+    expected = os.environ.get("DIALZARA_HOOK_TOKEN")
+    if not expected or token != expected:
+        return ("", 404)  # wrong/absent token -> pretend the route doesn't exist
+    data = request.get_json(silent=True)
+    if data is None:
+        try:
+            data = json.loads(request.get_data(as_text=True) or "{}")
+        except Exception:
+            data = request.form.to_dict() if request.form else {}
+    name    = str(_hook_find(data, "caller_name") or "").strip()
+    phone   = str(_hook_find(data, "caller_phone") or "").strip()
+    stype   = str(_hook_find(data, "service_type") or "").strip()
+    summary = str(_hook_find(data, "call_summary") or "").strip()
+    intent  = str(_hook_find(data, "is_cleaning_inquiry") or "").strip().lower()
+    is_cleaning = intent in ("yes", "y", "true", "1", "cleaning")
+    # Only a real cleaning inquiry with a callback number becomes a lead + alert.
+    if is_cleaning and phone:
+        note = "From phone call (Dialzara)." + ((" " + summary) if summary else "")
+        try:
+            _insert_lead_adaptive(name=name, phone=phone, source="dialzara",
+                                  service_type=stype, notes=note)
+        except Exception as e:
+            print("dialzara lead save:", repr(e), flush=True)
+        try:
+            notify_owner_new_lead(first_name=name, phone=phone,
+                                  source="dialzara", notes=summary)
+        except Exception as e:
+            print("dialzara alert:", repr(e), flush=True)
+        return jsonify({"ok": True, "lead": True})
+    return jsonify({"ok": True, "lead": False, "reason": "not a cleaning inquiry or no phone"})
+
+
+app.add_url_rule("/hook/call/<token>", "dialzara_hook", _dialzara_hook, methods=["POST"])
+
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
