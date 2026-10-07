@@ -8267,6 +8267,31 @@ except Exception:
     pass
 # === /CUSTOMER_BRIEFING_V1 ===
 
+
+
+# === CBRIEF_NAV_V1 (clickable Customer Briefing button in admin nav) ===
+try:
+    _cbrief_prev_admin_nav = admin_nav  # capture current admin_nav (may already be wrapped)
+
+    def admin_nav(*_a, **_k):
+        _html = _cbrief_prev_admin_nav(*_a, **_k)
+        try:
+            from flask import session
+            if (session.get('logged_in')
+                    and isinstance(_html, str)
+                    and '/admin/customer-briefing' not in _html):
+                _btn = ("<a href='/admin/customer-briefing' "
+                        "style='display:inline-block;margin-left:8px;padding:6px 12px;"
+                        "background:#c0603a;color:#fff;text-decoration:none;"
+                        "border-radius:6px;font-size:14px;'>Customer Briefing</a>")
+                _html = _html + _btn
+        except Exception:
+            pass
+        return _html
+except Exception:
+    pass
+# === /CBRIEF_NAV_V1 ===
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
