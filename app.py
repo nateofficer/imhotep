@@ -8154,6 +8154,119 @@ def _dialzara_hook(token):
 app.add_url_rule("/hook/call/<token>", "dialzara_hook", _dialzara_hook, methods=["POST"])
 
 
+
+
+# === CUSTOMER_BRIEFING_V1 (admin-only, read-only customer lookup) ===
+def _cbrief_esc(v):
+    import html as _h
+    if v is None:
+        return ""
+    return _h.escape(str(v))
+
+def _cbrief_page():
+    from flask import request, session, abort
+    if not session.get('logged_in'):
+        abort(404)
+
+    q = (request.args.get('q') or '').strip()
+    out = []
+    out.append("<!doctype html><meta charset='utf-8'>")
+    out.append("<meta name='viewport' content='width=device-width, initial-scale=1'>")
+    out.append("<title>Customer Briefing</title>")
+    out.append("<style>"
+               "body{font-family:-apple-system,Segoe UI,Arial,sans-serif;max-width:760px;"
+               "margin:0 auto;padding:16px;color:#1f2d4a}"
+               "h1{font-size:20px}"
+               "h2{font-size:16px;margin-top:22px;border-bottom:1px solid #d9cfc2;padding-bottom:4px}"
+               "input[type=text]{padding:10px;font-size:16px;width:66%;border:1px solid #c0603a;border-radius:8px}"
+               "button{padding:10px 16px;font-size:16px;background:#c0603a;color:#fff;border:0;border-radius:8px}"
+               "table{border-collapse:collapse;width:100%;margin:8px 0}"
+               "td{border:1px solid #e3dccf;padding:6px 8px;vertical-align:top;font-size:14px}"
+               "td.k{background:#faf7f2;font-weight:600;white-space:nowrap;width:38%}"
+               ".job{border:1px solid #e3dccf;border-radius:8px;padding:10px;margin:10px 0}"
+               ".muted{color:#6b6b6b}"
+               "@media print{form,.noprint{display:none}}"
+               "</style>")
+    out.append("<h1>Customer Briefing <span class='muted noprint'>(admin)</span></h1>")
+    out.append("<form method='get' class='noprint'>"
+               "<input type='text' name='q' placeholder='Customer name' value='" + _cbrief_esc(q) + "' autofocus> "
+               "<button>Search</button></form>")
+
+    if not q:
+        out.append("<p class='muted'>Type a customer name and search.</p>")
+        return "\n".join(out)
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    # --- discover the customers schema (DictCursor -> rows keyed by column name) ---
+    cols = []
+    try:
+        cur.execute("DESCRIBE customers")
+        for r in cur.fetchall():
+            cols.append({'name': r['Field'], 'type': str(r['Type'])})
+    except Exception as e:
+        out.append("<p>Could not read the <code>customers</code> table: " + _cbrief_esc(e) + "</p>")
+        return "\n".join(out)
+
+    text_cols = [c['name'] for c in cols
+                 if any(t in c['type'].lower() for t in ('char', 'text'))]
+
+    if text_cols:
+        where = " OR ".join("`" + c + "` LIKE %s" for c in text_cols)
+        params = tuple(["%" + q + "%"] * len(text_cols))
+        cur.execute("SELECT * FROM customers WHERE " + where + " LIMIT 25", params)
+    else:
+        cur.execute("SELECT * FROM customers LIMIT 25")
+    customers = cur.fetchall()
+
+    if not customers:
+        out.append("<p>No customer found matching <b>" + _cbrief_esc(q) + "</b>.</p>")
+        return "\n".join(out)
+
+    id_col = 'id' if any(c['name'] == 'id' for c in cols) else (cols[0]['name'] if cols else 'id')
+
+    out.append("<button class='noprint' onclick='window.print()' "
+               "style='float:right;background:#1f2d4a'>Print</button>")
+
+    for cust in customers:
+        name_bits = [str(cust.get(k)) for k in
+                     ('name', 'full_name', 'cust_first', 'first_name', 'cust_last', 'last_name')
+                     if cust.get(k)]
+        header = " ".join(name_bits) if name_bits else ("Customer #" + str(cust.get(id_col, '')))
+        out.append("<h2>" + _cbrief_esc(header) + "</h2>")
+        out.append("<table>")
+        for c in cols:
+            k = c['name']
+            out.append("<tr><td class='k'>" + _cbrief_esc(k) + "</td><td>" + _cbrief_esc(cust.get(k)) + "</td></tr>")
+        out.append("</table>")
+
+        cid = cust.get(id_col)
+        out.append("<h2>Past jobs</h2>")
+        try:
+            cur.execute("SELECT * FROM cleaning_jobs WHERE customer_id=%s ORDER BY scheduled_date DESC", (cid,))
+            jobs = cur.fetchall()
+            if not jobs:
+                out.append("<p class='muted'>No job history recorded for this customer.</p>")
+            else:
+                for j in jobs:
+                    out.append("<div class='job'>")
+                    for jk in ('scheduled_date', 'scheduled_time', 'service_type',
+                               'status', 'price', 'recurrence_rule', 'notes'):
+                        if jk in j:
+                            out.append("<div><b>" + _cbrief_esc(jk) + ":</b> " + _cbrief_esc(j.get(jk)) + "</div>")
+                    out.append("</div>")
+        except Exception as e:
+            out.append("<p class='muted'>Job history unavailable: " + _cbrief_esc(e) + "</p>")
+
+    return "\n".join(out)
+
+try:
+    app.add_url_rule('/admin/customer-briefing', 'cbrief_page', _cbrief_page)
+except Exception:
+    pass
+# === /CUSTOMER_BRIEFING_V1 ===
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
