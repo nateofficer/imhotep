@@ -6035,6 +6035,23 @@ def compliance_list():
     return html
 
 
+@app.route('/compliance/seed-utah', methods=['GET'])
+@login_required
+def compliance_seed_utah():
+    conn = get_db()
+    cursor = conn.cursor()
+    items = [
+        ('Registration', 'Utah Dept of Commerce - Business Registration', 'Salt Lake City', '2026-12-31', 'one_time', 'pending', 'corporations.utah.gov | 801-530-4849'),
+        ('Tax Filing', 'Utah State Tax Commission - Account and Sales Tax Number', 'Salt Lake City', '2026-12-31', 'one_time', 'pending', 'tax.utah.gov | 801-297-2200'),
+        ('License', 'SLC Business License - 451 S State St Room 225', 'Salt Lake City', '2026-12-31', 'annual', 'pending', 'slc.gov/finance/business-licensing | 801-535-6644'),
+        ('Other', 'Utah Unemployment Insurance', 'Salt Lake City', '2026-12-31', 'one_time', 'pending', 'jobs.utah.gov/ui/employer | 801-526-9235'),
+    ]
+    for i in items:
+        cursor.execute('INSERT INTO compliance_items (category,description,market,due_date,recurrence,status,notes) VALUES (%s,%s,%s,%s,%s,%s,%s)', i)
+    conn.commit()
+    conn.close()
+    return redirect('/compliance')
+
 @app.route('/compliance/new', methods=['GET', 'POST'])
 @login_required
 def compliance_new():
