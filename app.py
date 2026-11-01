@@ -604,6 +604,20 @@ def home():
     }
     .lp-foot a { font-size:12px; color:#aaa; margin:0 10px; text-decoration:none; }
     .lp-foot a:hover { color:#3498db; }
+    .lp-market-pick { text-align:center; padding:18px 16px 4px; }
+    .lp-market-label { font-size:14px; color:#555; margin-bottom:14px; font-weight:600; letter-spacing:.3px; }
+    .lp-market-cards { display:flex; justify-content:center; gap:16px; flex-wrap:wrap; }
+    .lp-market-card {
+        display:flex; flex-direction:column; align-items:center;
+        background:#fff; border:2px solid #e2d6cc; border-radius:14px;
+        padding:20px 28px; text-decoration:none; color:#2c3e50;
+        box-shadow:0 2px 10px rgba(0,0,0,.08); transition:all .2s;
+        min-width:140px;
+    }
+    .lp-market-card:hover { border-color:#e67e22; box-shadow:0 4px 18px rgba(230,126,34,.18); transform:translateY(-2px); }
+    .lp-market-card .lp-market-icon { font-size:32px; margin-bottom:8px; }
+    .lp-market-card b { font-size:15px; font-weight:700; margin-bottom:4px; }
+    .lp-market-card span { font-size:12px; color:#888; }
     </style>
 
     <div class="lp">
@@ -619,6 +633,22 @@ def home():
         <span>&#10003; Veteran-Owned</span>
         <span>&#10003; Background-Checked</span>
       </div>
+
+    <div class="lp-market-pick">
+        <p class="lp-market-label">Choose your location to get started:</p>
+        <div class="lp-market-cards">
+            <a class="lp-market-card" href="/quote?market=las-vegas">
+                <div class="lp-market-icon">&#127961;</div>
+                <b>Las Vegas, NV</b>
+                <span>Nevada market</span>
+            </a>
+            <a class="lp-market-card" href="/quote?market=salt-lake-city">
+                <div class="lp-market-icon">&#9968;</div>
+                <b>Salt Lake City, UT</b>
+                <span>Utah market</span>
+            </a>
+        </div>
+    </div>
 
       <div class="lp-photos">
         <!-- PHOTO_1 --><div class="lp-photo"><div class="lp-ph">Your after-photo #1<br>(swap in later)</div></div>
