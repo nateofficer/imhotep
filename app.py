@@ -618,14 +618,22 @@ def home():
     .lp-market-card .lp-market-icon { font-size:32px; margin-bottom:8px; }
     .lp-market-card b { font-size:15px; font-weight:700; margin-bottom:4px; }
     .lp-market-card span { font-size:12px; color:#888; }
+    .lp-foot { display:flex; flex-wrap:wrap; justify-content:center; gap:14px; padding:24px 16px 32px; background:#fafafa; border-top:1px solid #eee; }
+    .lp-nav-card {
+        display:flex; flex-direction:column; align-items:center;
+        background:#fff; border:1px solid #e2d6cc; border-radius:14px;
+        padding:18px 20px; text-decoration:none; color:#2c3e50;
+        box-shadow:0 2px 8px rgba(0,0,0,.07); transition:all .2s;
+        min-width:110px; text-align:center;
+    }
+    .lp-nav-card:hover { border-color:#e67e22; transform:translateY(-2px); box-shadow:0 4px 14px rgba(230,126,34,.15); }
+    .lp-nav-icon { font-size:28px; margin-bottom:6px; display:block; }
+    .lp-nav-card b { font-size:13px; font-weight:700; display:block; margin-bottom:3px; }
+    .lp-nav-card span { font-size:11px; color:#999; }
     </style>
 
     <div class="lp">
-      <div class="lp-hero">
-        <h1>Las Vegas&rsquo;s Trusted Home Cleaning</h1>
-        <p class="tag">Spotless homes, honest pricing, people you can trust in your home.</p>
-        <a class="lp-cta" href="/quote">Get My Free Quote &rarr;</a>
-      </div>
+      
 
       <div class="lp-trust">
         <span>&#10003; Bonded</span>
@@ -671,20 +679,34 @@ def home():
         rental turnover &mdash; we treat every home like it&rsquo;s our own.
       </div>
 
-      <div class="lp-bottom">
-        <a class="lp-cta" href="/quote">Get My Free Quote &rarr;</a>
-      </div>
+      
     </div>
     '''
 
     if not session.get('logged_in') and not session.get('trainee_id'):
         html += '''
     <div class="lp-foot">
-        <a href="/jobs">Careers</a>
-        <a href="/login">Admin</a>
-        <a href="/trainee-login">Staff</a>
-        <a href="/dozens">Name the Group</a>
-    </div>
+            <a class="lp-nav-card" href="/jobs">
+                <span class="lp-nav-icon">&#128188;</span>
+                <b>Careers</b>
+                <span>Join our team</span>
+            </a>
+            <a class="lp-nav-card" href="/login">
+                <span class="lp-nav-icon">&#128274;</span>
+                <b>Admin</b>
+                <span>Business login</span>
+            </a>
+            <a class="lp-nav-card" href="/trainee-login">
+                <span class="lp-nav-icon">&#128100;</span>
+                <b>Staff</b>
+                <span>Trainee portal</span>
+            </a>
+            <a class="lp-nav-card" href="/dozens">
+                <span class="lp-nav-icon">&#127919;</span>
+                <b>Name the Group</b>
+                <span>Team activity</span>
+            </a>
+        </div>
     '''
 
     return html
