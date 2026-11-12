@@ -712,6 +712,31 @@ def home():
     return html
 
 
+@app.route('/jobs/seed-slc', methods=['GET'])
+@login_required
+def jobs_seed_slc():
+    conn = get_db()
+    cursor = conn.cursor()
+    # Only insert if no SLC job exists yet
+    cursor.execute("SELECT COUNT(*) as cnt FROM jobs WHERE location LIKE %s", ('%Salt Lake%',))
+    row = cursor.fetchone()
+    if row['cnt'] == 0:
+        cursor.execute(
+            "INSERT INTO jobs (title, description, pay, location) VALUES (%s, %s, %s, %s)",
+            (
+                'Part-Time Cleaner',
+                'Join Casey's Cleaning Company! We are hiring reliable, detail-oriented part-time cleaners for residential and commercial cleaning in the Salt Lake City area, including South Salt Lake and surrounding communities.',
+                '$16-18/hr DOE',
+                'Salt Lake City, UT'
+            )
+        )
+        conn.commit()
+        msg = 'SLC job added.'
+    else:
+        msg = 'SLC job already exists, skipped.'
+    conn.close()
+    return f'<p>{msg}</p><a href="/jobs">View Jobs</a>'
+
 @app.route('/jobs')
 def show_jobs():
     conn = get_db()
