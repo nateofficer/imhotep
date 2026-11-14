@@ -1815,13 +1815,59 @@ def staff_evaluate():
 @app.route('/applications')
 @login_required
 def view_applications():
+    from flask import request
+    market = request.args.get('market', '')
+
+    # ── Market picker ───────────────────────────────────────────────────────
+    if not market:
+        picker_html = STYLE + admin_nav() + '''
+        <style>
+        .mkt-pick { display:flex; gap:2rem; justify-content:center; margin:4rem auto; max-width:600px; }
+        .mkt-card { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+                    background:#fff; border:2px solid #e0e0e0; border-radius:14px; padding:2.5rem 1.5rem;
+                    text-decoration:none; color:#222; transition:box-shadow .2s,border-color .2s; }
+        .mkt-card:hover { box-shadow:0 4px 18px rgba(0,0,0,.13); border-color:#3498db; }
+        .mkt-icon { font-size:3rem; margin-bottom:.75rem; }
+        .mkt-card b { font-size:1.25rem; }
+        .mkt-card span { font-size:.9rem; color:#666; margin-top:.3rem; }
+        </style>
+        <h1 style="text-align:center;margin-top:2rem;">Job Applications</h1>
+        <p style="text-align:center;color:#666;">Choose a market to view applicants:</p>
+        <div class="mkt-pick">
+            <a class="mkt-card" href="/applications?market=lv">
+                <div class="mkt-icon">&#127961;</div>
+                <b>Las Vegas, NV</b>
+                <span>Nevada market</span>
+            </a>
+            <a class="mkt-card" href="/applications?market=slc">
+                <div class="mkt-icon">&#9968;</div>
+                <b>Salt Lake City, UT</b>
+                <span>Utah market</span>
+            </a>
+        </div>
+        '''
+        return picker_html
+
+    # ── Market filter ───────────────────────────────────────────────────────
+    if market == 'lv':
+        loc_filter = "AND jobs.location LIKE '%Las Vegas%'"
+        market_label = 'Las Vegas, NV'
+        other_market = 'slc'
+        other_label = 'Salt Lake City'
+    else:
+        loc_filter = "AND jobs.location LIKE '%Salt Lake%'"
+        market_label = 'Salt Lake City, UT'
+        other_market = 'lv'
+        other_label = 'Las Vegas'
+
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute('''
+    cursor.execute(f'''
         SELECT candidates.*, jobs.title as job_title
         FROM candidates
         LEFT JOIN jobs ON candidates.job_id = jobs.id
         WHERE (candidates.status IS NULL OR candidates.status NOT IN ('Active', 'Scheduling', 'Archived'))
+        {loc_filter}
         ORDER BY candidates.flagged ASC, candidates.score DESC, candidates.applied_date DESC
     ''')
     apps = cursor.fetchall()
@@ -1836,8 +1882,8 @@ def view_applications():
         interview_scores = {}
     conn.close()
 
-    html = STYLE + admin_nav() + '<h1>Job Applications</h1>'
-    html += '<p class="form-note">Sorted by: not flagged first, then highest score, then newest.</p>'
+    html = STYLE + admin_nav() + f'<h1>Job Applications &mdash; {market_label}</h1>'
+    html += f'<p class="form-note">Sorted by: not flagged first, then highest score, then newest. &nbsp;|&nbsp; <a href="/applications?market={other_market}">Switch to {other_label}</a></p>'
 
     if not apps:
         html += '<p>No applications yet.</p>'
