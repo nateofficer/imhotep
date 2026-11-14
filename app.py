@@ -725,7 +725,7 @@ def jobs_seed_slc():
             "INSERT INTO jobs (title, description, pay, location) VALUES (%s, %s, %s, %s)",
             (
                 "Part-Time Cleaner",
-                "Join Casey's Cleaning Company! We are hiring reliable, detail-oriented part-time cleaners for residential and commercial cleaning in the Salt Lake City area, including South Salt Lake and surrounding communities.',
+                "Join Casey's Cleaning Company! We are hiring reliable, detail-oriented part-time cleaners for residential and commercial cleaning in the Salt Lake City area, including South Salt Lake and surrounding communities.",
                 "$16-18/hr DOE",
                 "Salt Lake City, UT"
             )
