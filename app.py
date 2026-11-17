@@ -1271,18 +1271,52 @@ def dashboard():
 @app.route('/staff')
 @login_required
 def staff_list():
+    from flask import request
+    market = request.args.get('market', 'all')
+
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute('''
-        SELECT candidates.*,
-               trainees.id as trainee_id,
-               trainees.hired_date,
-               trainees.access_code
-        FROM candidates
-        LEFT JOIN trainees ON trainees.candidate_id = candidates.id
-        WHERE candidates.status IN ('Active', 'Scheduling')
-        ORDER BY candidates.first_name ASC
-    ''')
+
+    if market == 'lv':
+        cursor.execute('''
+            SELECT candidates.*,
+                    trainees.id as trainee_id,
+                    trainees.hired_date,
+                    trainees.access_code
+            FROM candidates
+            LEFT JOIN trainees ON trainees.candidate_id = candidates.id
+            LEFT JOIN jobs ON candidates.job_id = jobs.id
+            WHERE candidates.status IN ('Active', 'Scheduling')
+            AND jobs.location LIKE %s
+            ORDER BY candidates.first_name ASC
+        ''', ('%Las Vegas%',))
+        market_label = 'Las Vegas, NV'
+    elif market == 'slc':
+        cursor.execute('''
+            SELECT candidates.*,
+                    trainees.id as trainee_id,
+                    trainees.hired_date,
+                    trainees.access_code
+            FROM candidates
+            LEFT JOIN trainees ON trainees.candidate_id = candidates.id
+            LEFT JOIN jobs ON candidates.job_id = jobs.id
+            WHERE candidates.status IN ('Active', 'Scheduling')
+            AND jobs.location LIKE %s
+            ORDER BY candidates.first_name ASC
+        ''', ('%Salt Lake%',))
+        market_label = 'Salt Lake City, UT'
+    else:
+        cursor.execute('''
+            SELECT candidates.*,
+                    trainees.id as trainee_id,
+                    trainees.hired_date,
+                    trainees.access_code
+            FROM candidates
+            LEFT JOIN trainees ON trainees.candidate_id = candidates.id
+            WHERE candidates.status IN ('Active', 'Scheduling')
+            ORDER BY candidates.first_name ASC
+        ''')
+        market_label = 'All Markets'
     staff = cursor.fetchall()
 
     # Get certification status for each trainee
@@ -1303,7 +1337,9 @@ def staff_list():
             passed_by_trainee[r['trainee_id']] += 1
 
     html = STYLE + admin_nav()
-    html += '<h1>Staff</h1>'
+    market_links = '<div style="margin-bottom:15px;"><a href="/staff" style="margin-right:10px;color:#3498db;font-weight:bold;">All</a> <a href="/staff?market=lv" style="margin-right:10px;color:#8e44ad;">Las Vegas</a> <a href="/staff?market=slc" style="color:#8e44ad;">Salt Lake City</a></div>'
+    html += f'<h1>Staff &mdash; {market_label}</h1>'
+    html += market_links
     html += '<p><a class="btn btn-success" href="/employee/new">+ Add Employee</a> <a class="btn" href="/staff/evaluate" style="background:#2c3e50;">&#128202; Evaluate Crew</a></p>  <!--staff-add-->'
     html += '<p class="form-note">Showing Active and Scheduling crew members only. '
     html += '<a href="/applications">View all applicants &rarr;</a></p>'
