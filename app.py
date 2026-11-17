@@ -2627,20 +2627,56 @@ def delete_question(question_id):
 @app.route('/trainees')
 @login_required
 def trainees_list():
+    from flask import request
+    market = request.args.get('market', 'all')
+
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute('''
-        SELECT trainees.*, candidates.first_name, candidates.last_name
-        FROM trainees
-        LEFT JOIN candidates ON trainees.candidate_id = candidates.id
-        ORDER BY trainees.hired_date DESC
-    ''')
+
+    if market == 'lv':
+        cursor.execute('''
+            SELECT trainees.*, candidates.first_name, candidates.last_name
+            FROM trainees
+            LEFT JOIN candidates ON trainees.candidate_id = candidates.id
+            LEFT JOIN jobs ON candidates.job_id = jobs.id
+            WHERE jobs.location LIKE %s
+            ORDER BY trainees.hired_date DESC
+        ''', ('%Las Vegas%',))
+        market_label = 'Las Vegas, NV'
+        other_market, other_label = 'slc', 'Salt Lake City'
+    elif market == 'slc':
+        cursor.execute('''
+            SELECT trainees.*, candidates.first_name, candidates.last_name
+            FROM trainees
+            LEFT JOIN candidates ON trainees.candidate_id = candidates.id
+            LEFT JOIN jobs ON candidates.job_id = jobs.id
+            WHERE jobs.location LIKE %s
+            ORDER BY trainees.hired_date DESC
+        ''', ('%Salt Lake%',))
+        market_label = 'Salt Lake City, UT'
+        other_market, other_label = 'lv', 'Las Vegas'
+    else:
+        cursor.execute('''
+            SELECT trainees.*, candidates.first_name, candidates.last_name
+            FROM trainees
+            LEFT JOIN candidates ON trainees.candidate_id = candidates.id
+            ORDER BY trainees.hired_date DESC
+        ''')
+        market_label = 'All Markets'
+        other_market, other_label = None, None
     trainees = cursor.fetchall()
 
     cursor.execute('SELECT COUNT(*) as cnt FROM training_modules WHERE required = 1')
     required_count = cursor.fetchone()['cnt']
 
-    html = STYLE + admin_nav() + '<h1>Trainees</h1>'
+    market_links = '''<div style="margin-bottom:15px;">
+        <a href="/trainees" style="margin-right:10px;color:#3498db;font-weight:bold;">All</a>
+        <a href="/trainees?market=lv" style="margin-right:10px;color:#8e44ad;">Las Vegas</a>
+        <a href="/trainees?market=slc" style="color:#8e44ad;">Salt Lake City</a>
+    </div>'''
+
+    html = STYLE + admin_nav() + f'<h1>Trainees &mdash; {market_label}</h1>'
+    html += market_links
 
     if not trainees:
         html += '<p>No trainees yet. Hire someone from the Applications page to create a trainee.</p>'
