@@ -3660,13 +3660,7 @@ def crm_list():
     if _where:
         _q += ' WHERE ' + ' AND '.join(_where)
     _q += ' ORDER BY created_date DESC'
-    try:
-        cursor.execute(_q, tuple(_params))
-    except Exception:
-        if status_filter != 'all':
-            cursor.execute('SELECT * FROM leads WHERE status = %s ORDER BY created_date DESC', (status_filter,))
-        else:
-            cursor.execute('SELECT * FROM leads ORDER BY created_date DESC')
+    cursor.execute(_q, tuple(_params))
     leads = cursor.fetchall()
     cursor.execute('SELECT status, COUNT(*) as cnt FROM leads GROUP BY status')
     counts = {row['status']: row['cnt'] for row in cursor.fetchall()}
