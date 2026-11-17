@@ -3804,7 +3804,8 @@ def crm_new():
                         request.form.get('phone', ''), request.form.get('email', ''),
                         request.form.get('address', ''), request.form.get('service_type', ''),
                         request.form.get('status', 'new'), request.form.get('notes', ''),
-                        request.form.get('lead_source_id') or None))
+                        request.form.get('lead_source_id') or None,
+             request.form.get('market', 'las-vegas')))
         conn.commit()
         conn.close()
         return redirect('/crm')
@@ -4534,8 +4535,8 @@ def customers_new():
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''INSERT INTO customers
-                          (first_name, last_name, phone, email, address, active, lead_source_id)
-                          VALUES (%s, %s, %s, %s, %s, %s, %s)''',
+                          (first_name, last_name, phone, email, address, active, lead_source_id, market)
+                          VALUES (%s, %s, %s, %s, %s, %s, %s, %s)''',
                        (request.form['first_name'], request.form['last_name'],
                         request.form.get('phone', ''), request.form.get('email', ''),
                         request.form.get('address', ''),
