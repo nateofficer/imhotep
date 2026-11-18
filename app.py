@@ -4572,13 +4572,22 @@ document.getElementById('go').addEventListener('click', function(){
 @app.route('/customers')
 @login_required
 def customers_list():
+    from flask import request
+    market = request.args.get('market', 'all')
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute('SELECT * FROM customers ORDER BY created_date DESC')
+    if market == 'las-vegas':
+        cursor.execute('SELECT * FROM customers WHERE market = %s ORDER BY created_date DESC', ('las-vegas',))
+    elif market == 'salt-lake-city':
+        cursor.execute('SELECT * FROM customers WHERE market = %s ORDER BY created_date DESC', ('salt-lake-city',))
+    else:
+        cursor.execute('SELECT * FROM customers ORDER BY created_date DESC')
     customers = cursor.fetchall()
     conn.close()
 
+    market_links = '<div style="margin-bottom:15px;"><a href="/customers" style="margin-right:10px;color:#3498db;font-weight:bold;">All</a> <a href="/customers?market=las-vegas" style="margin-right:10px;color:#8e44ad;">Las Vegas</a> <a href="/customers?market=salt-lake-city" style="color:#8e44ad;">Salt Lake City</a></div>'
     html = STYLE + admin_nav() + '<h1>Customers</h1>'
+    html += market_links
     html += '<p><a class="btn btn-success" href="/customers/new">+ Add Customer</a></p>'
 
     if not customers:
