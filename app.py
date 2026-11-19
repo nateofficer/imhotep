@@ -4055,7 +4055,7 @@ QUOTE_FREQ_LABEL = {
 }
 
 
-def compute_quote(cleaning_type, bedrooms, bathrooms, sqft, frequency):
+def compute_quote(cleaning_type, bedrooms, bathrooms, sqft, frequency, market='las-vegas'):
     """Return (price, label) for a quote configuration."""
     try:
         bedrooms = max(0, min(10, int(bedrooms)))
@@ -4073,18 +4073,27 @@ def compute_quote(cleaning_type, bedrooms, bathrooms, sqft, frequency):
     ctype = cleaning_type if cleaning_type in QUOTE_TYPE_MULT else 'standard'
     freq = frequency if frequency in QUOTE_FREQ_MULT else 'onetime'
 
-    base = (QUOTE_BASE
-            + QUOTE_PER_BED * bedrooms
-            + QUOTE_PER_BATH * bathrooms
-            + QUOTE_PER_SQFT * sqft)
+    if market == 'salt-lake-city':
+        slc_base = (QUOTE_BASE * 0.90
+                    + QUOTE_PER_BED * 0.90 * bedrooms
+                    + QUOTE_PER_BATH * 0.90 * bathrooms
+                    + QUOTE_PER_SQFT * 0.90 * sqft)
+        base = slc_base
+        quote_min = QUOTE_MIN * 0.90
+    else:
+        base = (QUOTE_BASE
+                + QUOTE_PER_BED * bedrooms
+                + QUOTE_PER_BATH * bathrooms
+                + QUOTE_PER_SQFT * sqft)
+        quote_min = QUOTE_MIN
     price = base * QUOTE_TYPE_MULT[ctype]
 
     # deep and move-out cleans are inherently one-off; no frequency discount
     if ctype in ('standard', 'airbnb'):
         price = price * QUOTE_FREQ_MULT[freq]
 
-    if price < QUOTE_MIN:
-        price = QUOTE_MIN
+    if price < quote_min:
+        price = quote_min
     return int(round(price)), QUOTE_TYPE_LABEL[ctype]
 
 
@@ -4195,7 +4204,8 @@ def quote_price():
     if not first_name or not email:
         return {'ok': False, 'error': 'Name and email are required.'}, 400
 
-    price, type_label = compute_quote(cleaning_type, bedrooms, bathrooms, sqft, frequency)
+    market = 'salt-lake-city' if 'salt lake' in city.lower() or 'slc' in city.lower() or 'utah' in city.lower() else 'las-vegas'
+    price, type_label = compute_quote(cleaning_type, bedrooms, bathrooms, sqft, frequency, market)
     freq_label = QUOTE_FREQ_LABEL.get(frequency, 'One-time only')
 
     full_notes = "[Quote] %s | %s | Beds: %s | Baths: %s | SqFt: %s | Estimate: $%s" % (
