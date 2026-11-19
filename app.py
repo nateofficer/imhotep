@@ -3587,6 +3587,13 @@ def init_crm_db():
         except Exception:
             pass
     try:
+        cursor.execute('SELECT market FROM customers LIMIT 1')
+    except Exception:
+        try:
+            cursor.execute("ALTER TABLE customers ADD COLUMN market VARCHAR(20) DEFAULT 'las-vegas'")
+        except Exception:
+            pass
+    try:
         cursor.execute('''CREATE TABLE IF NOT EXISTS quote_events (
             id INT AUTO_INCREMENT PRIMARY KEY,
             event VARCHAR(20),
