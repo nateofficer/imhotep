@@ -8525,6 +8525,110 @@ except Exception:
     pass
 # === /CBRIEF_NAV_V1 ===
 
+@app.route('/admin/cleanup', methods=['GET', 'POST'])
+@login_required
+def admin_cleanup():
+    conn = get_db()
+    cursor = conn.cursor()
+
+    if request.method == 'POST':
+        keep_ids = request.form.getlist('keep')
+        keep_ids = [int(i) for i in keep_ids]
+
+        # Get all candidate IDs
+        cursor.execute('SELECT id FROM candidates')
+        all_ids = [r['id'] for r in cursor.fetchall()]
+        delete_ids = [i for i in all_ids if i not in keep_ids]
+
+        for cid in delete_ids:
+            # Get trainee id if exists
+            cursor.execute('SELECT id FROM trainees WHERE candidate_id = %s', (cid,))
+            trainee = cursor.fetchone()
+            if trainee:
+                tid = trainee['id']
+                cursor.execute('DELETE FROM onboarding_signatures WHERE trainee_id = %s', (tid,))
+                cursor.execute('DELETE FROM trainee_documents WHERE trainee_id = %s', (tid,))
+                cursor.execute('DELETE FROM trainees WHERE id = %s', (tid,))
+            cursor.execute('DELETE FROM module_progress WHERE candidate_id = %s', (cid,))
+            cursor.execute('DELETE FROM candidates WHERE id = %s', (cid,))
+
+        conn.commit()
+        conn.close()
+
+        deleted = len(delete_ids)
+        html = STYLE + admin_nav()
+        html += f'''
+        <h1>Cleanup Complete</h1>
+        <p style="color:green;font-size:18px;">Deleted {deleted} candidate(s) and all related records.</p>
+        <p><a href="/staff" class="btn btn-primary">Go to Staff</a>
+           <a href="/applications" class="btn btn-secondary" style="margin-left:10px;">Go to Applications</a></p>
+        '''
+        return html
+
+    # GET — show all candidates with checkboxes
+    cursor.execute('''
+        SELECT candidates.id, candidates.first_name, candidates.last_name,
+               candidates.status, candidates.email,
+               trainees.id as trainee_id, trainees.hired_date
+        FROM candidates
+        LEFT JOIN trainees ON trainees.candidate_id = candidates.id
+        ORDER BY candidates.last_name, candidates.first_name
+    ''')
+    candidates_list = cursor.fetchall()
+    conn.close()
+
+    # Default keepers — Dejannae Felton, Vanessa Davis, Elizabeth Brijmohan, Nathan Pinkney
+    keeper_names = ['dejannae felton', 'vanessa davis', 'elizabeth brijmohan', 'nathan pinkney']
+
+    rows = ''
+    for c in candidates_list:
+        full = f"{c['first_name']} {c['last_name']}".lower()
+        is_keeper = any(k in full for k in keeper_names)
+        checked = 'checked' if is_keeper else ''
+        trainee_badge = '<span style="background:#27ae60;color:#fff;padding:2px 8px;border-radius:4px;font-size:12px;margin-left:8px;">Trainee</span>' if c['trainee_id'] else ''
+        rows += f'''
+        <tr>
+          <td><input type="checkbox" name="keep" value="{c['id']}" {checked}></td>
+          <td>{c['first_name']} {c['last_name']}{trainee_badge}</td>
+          <td>{c['email'] or ''}</td>
+          <td>{c['status'] or ''}</td>
+          <td>{str(c['hired_date'])[:10] if c['hired_date'] else '—'}</td>
+        </tr>
+        '''
+
+    html = STYLE + admin_nav()
+    html += '''
+    <h1>&#x1F9F9; Candidate Cleanup</h1>
+    <p style="color:#c0392b;font-weight:bold;">
+      &#x26A0; This will permanently delete all candidates whose checkbox is NOT checked,
+      along with their trainee records, training progress, documents, and onboarding signatures.
+    </p>
+    <p>Check the boxes next to anyone you want to <strong>KEEP</strong>. Uncheck to delete.</p>
+    <form method="POST">
+      <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+        <thead>
+          <tr style="background:#2c3e50;color:#fff;">
+            <th style="padding:8px;">Keep?</th>
+            <th style="padding:8px;text-align:left;">Name</th>
+            <th style="padding:8px;text-align:left;">Email</th>
+            <th style="padding:8px;text-align:left;">Status</th>
+            <th style="padding:8px;text-align:left;">Hired</th>
+          </tr>
+        </thead>
+        <tbody>
+    '''
+    html += rows
+    html += '''
+        </tbody>
+      </table>
+      <button type="submit" style="background:#c0392b;color:#fff;padding:12px 30px;border:none;border-radius:6px;font-size:16px;cursor:pointer;">
+        &#x1F5D1; Delete Unchecked Candidates
+      </button>
+      <a href="/dashboard" style="margin-left:20px;color:#7f8c8d;">Cancel</a>
+    </form>
+    '''
+    return html
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
