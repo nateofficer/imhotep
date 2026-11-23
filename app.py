@@ -8699,6 +8699,29 @@ def applications_bulk_email():
     html += '<p style="margin-top:24px;"><a href="/applications" class="btn btn-primary">Back to Applications</a></p>'
     return html
 
+@app.route('/trainee/<int:trainee_id>/delete', methods=['POST'])
+@login_required
+def delete_trainee(trainee_id):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT candidate_id FROM trainees WHERE id = %s', (trainee_id,))
+    row = cursor.fetchone()
+    candidate_id = row['candidate_id'] if row else None
+
+    cursor.execute('DELETE FROM onboarding_signatures WHERE trainee_id = %s', (trainee_id,))
+    cursor.execute('DELETE FROM trainee_documents WHERE trainee_id = %s', (trainee_id,))
+    cursor.execute('DELETE FROM trainees WHERE id = %s', (trainee_id,))
+
+    if candidate_id:
+        cursor.execute('DELETE FROM module_progress WHERE candidate_id = %s', (candidate_id,))
+        cursor.execute('DELETE FROM candidates WHERE id = %s', (candidate_id,))
+
+    conn.commit()
+    conn.close()
+
+    market = request.args.get('market', '')
+    return redirect('/trainees' + (f'?market={market}' if market else ''))
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
