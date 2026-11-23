@@ -1994,6 +1994,7 @@ def view_applications():
                 </form>
             </div>
             '''
+    html += '</form>'
     return html
 
 
@@ -8627,6 +8628,75 @@ def admin_cleanup():
       <a href="/dashboard" style="margin-left:20px;color:#7f8c8d;">Cancel</a>
     </form>
     '''
+    return html
+
+@app.route('/applications/bulk-email', methods=['POST'])
+@login_required
+def applications_bulk_email():
+    import smtplib
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+
+    candidate_ids = request.form.getlist('candidate_ids')
+    if not candidate_ids:
+        return '<p style="color:red;padding:20px;">No applicants selected. <a href="/applications">Back</a></p>'
+
+    candidate_ids = [int(i) for i in candidate_ids]
+    conn = get_db()
+    cursor = conn.cursor()
+    placeholders = ','.join(['%s'] * len(candidate_ids))
+    cursor.execute(
+        f'SELECT id, first_name, last_name, email FROM candidates WHERE id IN ({placeholders})',
+        candidate_ids
+    )
+    rows = cursor.fetchall()
+    conn.close()
+
+    RESEND_KEY = os.environ.get('RESEND_API_KEY', '')
+    REPLY_TO = 'nathan@caseyscleaning.com'
+    FROM_EMAIL = 'noreply@caseyscleaning.com'
+    sent, failed = [], []
+
+    for c in rows:
+        if not c['email']:
+            failed.append(f"{c['first_name']} {c['last_name']} (no email on file)")
+            continue
+        subject = "Still interested in cleaning with Casey's Cleaning?"
+        body = (
+            f"Hi {c['first_name']},\n\n"
+            "We hope you're doing well! We wanted to follow up on your application "
+            "with Casey's Cleaning.\n\n"
+            "We're currently hiring in your area and wanted to check in -- "
+            "are you still interested in the position?\n\n"
+            "If so, simply reply to this email and we'll get you scheduled for a "
+            "quick phone interview. It only takes about 10 minutes!\n\n"
+            "Looking forward to hearing from you,\n\n"
+            "Nathan\nCasey's Cleaning\nnathan@caseyscleaning.com"
+        )
+        try:
+            msg = MIMEMultipart()
+            msg['From'] = FROM_EMAIL
+            msg['To'] = c['email']
+            msg['Subject'] = subject
+            msg['Reply-To'] = REPLY_TO
+            msg.attach(MIMEText(body, 'plain'))
+            with smtplib.SMTP('smtp.resend.com', 587) as srv:
+                srv.ehlo(); srv.starttls()
+                srv.login('resend', RESEND_KEY)
+                srv.sendmail(FROM_EMAIL, c['email'], msg.as_string())
+            sent.append(f"{c['first_name']} {c['last_name']} &lt;{c['email']}&gt;")
+        except Exception as ex:
+            failed.append(f"{c['first_name']} {c['last_name']} ({ex})")
+
+    html = STYLE + admin_nav()
+    html += (f'<h1>&#9993; Bulk Email Results</h1>'
+             f'<p style="color:#27ae60;font-size:16px;"><strong>{len(sent)} email(s) sent.</strong></p>')
+    if sent:
+        html += '<ul>' + ''.join(f'<li>&#10003; {s}</li>' for s in sent) + '</ul>'
+    if failed:
+        html += f'<p style="color:#c0392b;"><strong>{len(failed)} failed:</strong></p>'
+        html += '<ul style="color:#c0392b;">' + ''.join(f'<li>&#10007; {f}</li>' for f in failed) + '</ul>'
+    html += '<p style="margin-top:24px;"><a href="/applications" class="btn btn-primary">Back to Applications</a></p>'
     return html
 
 if __name__ == '__main__':
