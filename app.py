@@ -1923,6 +1923,17 @@ def view_applications():
 
     if not apps:
         html += '<p>No applications yet.</p>'
+    # -- Bulk email form --
+    html += '''<form method="POST" action="/applications/bulk-email" id="bulk-email-form">
+    <div style="background:#f0f4ff;border:1px solid #c0d0f0;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+      <label style="display:flex;align-items:center;gap:6px;font-weight:600;cursor:pointer;">
+        <input type="checkbox" id="select-all-apps" onchange="document.querySelectorAll('.app-check').forEach(c=>c.checked=this.checked)" style="width:16px;height:16px;">
+        Select All
+      </label>
+      <button type="submit" style="background:#2563eb;color:#fff;border:none;border-radius:6px;padding:8px 20px;font-weight:600;cursor:pointer;">&#9993; Send &ldquo;Still Interested?&rdquo; Email</button>
+      <span style="color:#666;font-size:0.9em;">Replies go to nathan@caseyscleaning.com</span>
+    </div>'''
+
     else:
         for app_row in apps:
             resume_link = ''
@@ -1962,7 +1973,7 @@ def view_applications():
 
             html += f'''
             <div class="application{flagged_class}">
-                <h2>{app_row['first_name']} {app_row['last_name']} {score_html} {interview_html} {flag_html} {hired_html}</h2>
+                <input type="checkbox" class="app-check" name="candidate_ids" value="{app_row['id']}" style="width:18px;height:18px;margin-right:8px;vertical-align:middle;"><h2>{app_row['first_name']} {app_row['last_name']} {score_html} {interview_html} {flag_html} {hired_html}</h2>
                 <p><strong>Position:</strong> {app_row['job_title'] or 'N/A'}</p>
                 <p><strong>Email:</strong> {app_row['email']}</p>
                 <p><strong>Phone:</strong> {app_row['phone'] or 'Not provided'}</p>
@@ -1995,6 +2006,8 @@ def view_applications():
             </div>
             '''
     html += '</form>'
+    html += '</form>  <!-- end bulk-email-form -->'
+
     return html
 
 
