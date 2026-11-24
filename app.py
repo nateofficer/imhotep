@@ -2234,10 +2234,23 @@ def update_candidate_status(candidate_id):
 def delete_application(candidate_id):
     conn = get_db()
     cursor = conn.cursor()
+    # Delete child rows first to satisfy foreign key constraints
+    cursor.execute('DELETE FROM phone_interviews WHERE candidate_id = %s', (candidate_id,))
+    cursor.execute('DELETE FROM module_progress WHERE candidate_id = %s', (candidate_id,))
+    # Delete any trainee record linked to this candidate
+    cursor.execute('SELECT id FROM trainees WHERE candidate_id = %s', (candidate_id,))
+    trainee = cursor.fetchone()
+    if trainee:
+        tid = trainee['id']
+        cursor.execute('DELETE FROM onboarding_signatures WHERE trainee_id = %s', (tid,))
+        cursor.execute('DELETE FROM trainee_documents WHERE trainee_id = %s', (tid,))
+        cursor.execute('DELETE FROM module_progress WHERE trainee_id = %s', (tid,))
+        cursor.execute('DELETE FROM trainees WHERE id = %s', (tid,))
     cursor.execute('DELETE FROM candidates WHERE id = %s', (candidate_id,))
     conn.commit()
     conn.close()
-    return redirect('/applications')
+    market = request.args.get('market', '')
+    return redirect('/applications' + (f'?market={market}' if market else ''))
 
 
 @app.route('/post-job', methods=['GET', 'POST'])
