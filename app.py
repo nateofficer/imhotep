@@ -8725,6 +8725,7 @@ def delete_trainee(trainee_id):
 
     cursor.execute('DELETE FROM onboarding_signatures WHERE trainee_id = %s', (trainee_id,))
     cursor.execute('DELETE FROM trainee_documents WHERE trainee_id = %s', (trainee_id,))
+    cursor.execute('DELETE FROM module_progress WHERE trainee_id = %s', (trainee_id,))
     cursor.execute('DELETE FROM trainees WHERE id = %s', (trainee_id,))
 
     if candidate_id:
