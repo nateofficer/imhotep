@@ -2737,7 +2737,9 @@ def trainees_list():
                 <p><strong>Progress:</strong> {progress_txt}</p>
                 <a class="btn" href="/trainee/{t['id']}">View Details &amp; Access Code</a>
                 <a class="btn" href="/admin/documents/assign/{t['id']}">Assign Documents</a>
-            </div>
+            
+            <form method="POST" action="/trainee/{t['id']}/delete" style="display:inline;" onsubmit="return confirm('Delete this trainee? Also removes their application.');"><button class="btn btn-danger" type="submit" style="margin-top:8px;">Delete</button></form>
+</div>
             '''
     conn.close()
     return html
