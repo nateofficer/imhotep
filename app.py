@@ -1923,18 +1923,16 @@ def view_applications():
 
     if not apps:
         html += '<p>No applications yet.</p>'
-    # -- Bulk email form --
-    html += '''<form method="POST" action="/applications/bulk-email" id="bulk-email-form">
-    <div style="background:#f0f4ff;border:1px solid #c0d0f0;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
-      <label style="display:flex;align-items:center;gap:6px;font-weight:600;cursor:pointer;">
-        <input type="checkbox" id="select-all-apps" onchange="document.querySelectorAll('.app-check').forEach(c=>c.checked=this.checked)" style="width:16px;height:16px;">
-        Select All
-      </label>
-      <button type="submit" style="background:#2563eb;color:#fff;border:none;border-radius:6px;padding:8px 20px;font-weight:600;cursor:pointer;">&#9993; Send &ldquo;Still Interested?&rdquo; Email</button>
-      <span style="color:#666;font-size:0.9em;">Replies go to nathan@caseyscleaning.com</span>
-    </div>'''
-
     else:
+        html += '''<form method="POST" action="/applications/bulk-email" id="bulk-email-form">
+        <div style="background:#f0f4ff;border:1px solid #c0d0f0;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+          <label style="display:flex;align-items:center;gap:6px;font-weight:600;cursor:pointer;">
+            <input type="checkbox" id="select-all-apps" onchange="document.querySelectorAll('.app-check').forEach(c=>c.checked=this.checked)" style="width:16px;height:16px;">
+            Select All
+          </label>
+          <button type="submit" style="background:#2563eb;color:#fff;border:none;border-radius:6px;padding:8px 20px;font-weight:600;cursor:pointer;">&#9993; Send &#8220;Still Interested?&#8221; Email</button>
+          <span style="color:#666;font-size:0.9em;">Replies go to nathan@caseyscleaning.com</span>
+        </div>'''
         for app_row in apps:
             resume_link = ''
             if app_row['resume_filename']:
