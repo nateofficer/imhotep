@@ -8742,7 +8742,6 @@ def delete_trainee(trainee_id):
         cursor.execute('DELETE FROM trainees WHERE id = %s', (trainee_id,))
 
         if candidate_id:
-            cursor.execute('DELETE FROM module_progress WHERE candidate_id = %s', (candidate_id,))
             cursor.execute('DELETE FROM candidates WHERE id = %s', (candidate_id,))
 
         conn.commit()
