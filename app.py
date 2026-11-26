@@ -8679,7 +8679,7 @@ def applications_bulk_email():
 
     RESEND_KEY = os.environ.get('RESEND_API_KEY', '')
     REPLY_TO = 'nathan@caseyscleaning.com'
-    FROM_EMAIL = 'noreply@caseyscleaning.com'
+    FROM_EMAIL = 'noreply@caseyscleaning.net'
     sent, failed = [], []
 
     for c in rows:
