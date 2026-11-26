@@ -2234,7 +2234,6 @@ def delete_application(candidate_id):
     cursor = conn.cursor()
     # Delete child rows first to satisfy foreign key constraints
     cursor.execute('DELETE FROM phone_interviews WHERE candidate_id = %s', (candidate_id,))
-    cursor.execute('DELETE FROM module_progress WHERE candidate_id = %s', (candidate_id,))
     # Delete any trainee record linked to this candidate
     cursor.execute('SELECT id FROM trainees WHERE candidate_id = %s', (candidate_id,))
     trainee = cursor.fetchone()
