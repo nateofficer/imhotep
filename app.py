@@ -1932,7 +1932,8 @@ def view_applications():
           </label>
           <button type="submit" style="background:#2563eb;color:#fff;border:none;border-radius:6px;padding:8px 20px;font-weight:600;cursor:pointer;">&#9993; Send &#8220;Still Interested?&#8221; Email</button>
           <span style="color:#666;font-size:0.9em;">Replies go to nathan@caseyscleaning.com</span>
-        </div>'''
+        </div>
+        '''
         for app_row in apps:
             resume_link = ''
             if app_row['resume_filename']:
